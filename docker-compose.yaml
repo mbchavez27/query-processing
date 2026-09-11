@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sakila-postgres-group
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Mount initialization script into container's auto-exec folder
+      - ./init-sakila.sh:/docker-entrypoint-initdb.d/init-sakila.sh
+      # Named volume for database persistence
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
