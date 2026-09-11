@@ -4,30 +4,38 @@ Hands On 1 for STADVDB: Investigation of Query Optimization
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (with Docker Compose v2)
+- [Docker Desktop](https://docs.docker.com/get-docker/) (includes Docker Compose v2)
+- [Python 3](https://www.python.org/downloads/) (for generating synthetic data)
+- [Git](https://git-scm.com/downloads)
 
 ## Getting Started
 
-1. Clone the repository:
+### 1. Clone the repository
 
-   ```bash
-   git clone <repo-url>
-   cd query-processing
-   ```
+```bash
+git clone <repo-url>
+cd query-processing
+```
 
-2. Copy the example environment file and adjust values if needed:
+### 2. Set up environment variables
 
-   ```bash
-   cp .env.example .env
-   ```
+**macOS / Linux:**
+```bash
+cp .env.example .env
+```
 
-3. Start the PostgreSQL container:
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
+```
 
-   ```bash
-   docker compose up -d
-   ```
+### 3. Start PostgreSQL
 
-   On first run, the Sakila sample database will be downloaded and loaded automatically. This may take a moment.
+```bash
+docker compose up -d
+```
+
+On first run, the Sakila sample database will be downloaded and loaded automatically. This may take a moment.
 
 ## Connecting
 
@@ -108,7 +116,7 @@ Output:
 
 ### Final Result
 
-The revised script generates realistic synthetic data with:
+The script generates realistic synthetic data with:
 
 - **100+ unique names** (100 first × 107 last) to minimize collisions across 1,000 customers
 - **Seasonal rental dates** weighted toward Fridays/Saturdays and November–December
