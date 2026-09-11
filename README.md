@@ -75,38 +75,9 @@ The base Sakila dataset has 599 customers and ~16k rentals. For query optimizati
 
 ## GenAI Usage
 
-This project uses GenAI (OpenCode, mimo-v2-5-free model) to generate the synthetic data script.
+This project uses GenAI (Gemini) to generate the synthetic data script.
 
-### Original Prompt
-
-```prompt
-Write a complete Python script named generate_dump.py that outputs a PostgreSQL-compatible SQL dump file called sakila_dump.sql for the Sakila database.
-
-The script must fulfill the following requirements:
-
-    Volume & Scope: Insert 1,000 new customers (starting at customer_id 600) using realistic generic first and last names, emails, and address IDs (1–599). Insert 100,000 new rentals (starting at rental_id 16045) and 100,000 new payments linked strictly to those rentals.
-
-    Referential Integrity & Sequences: Ensure foreign keys match properly across tables. At the end of the script, include PostgreSQL SELECT setval(...) commands to update the auto-increment sequences for customer, rental, and payment so future manual inserts don't collide.
-
-    Realistic Data Skew:
-
-        For customer rental frequency, do not use a uniform distribution. Apply a power-law / Pareto skew using pow(random.random(), 2.5) so a small percentage of customers account for the majority of rentals.
-
-        For payments, select from standard rental tiers ($0.99, $2.99, $4.99) and conditionally add a randomized late fee (between $1.00 and $5.00) to roughly 15% of the transactions.
-
-    Output: Wrap everything inside a BEGIN; and COMMIT; transaction block and print a success message when the file is finished.
-```
-
-### Analysis of Initial Output
-
-The initial script produced correct data volume and referential integrity, but had four gaps when evaluated against the assignment's realism requirements:
-
-1. **Name collisions** — Only 15 first names and 15 last names (225 unique combos) for 1,000 customers.
-2. **Flat temporal distribution** — Rental and payment dates were uniformly distributed across 365 days, missing weekday and seasonal patterns.
-3. **Unrealistic returns** — All return dates were 1–10 days, with no late returns.
-4. **Uncorrelated payments** — Payment dates were independent of rental dates, allowing payments before rentals.
-
-### Revised Prompt
+### Prompt
 
 ```prompt
 Write a complete Python script named generate_dump.py that outputs a PostgreSQL-compatible SQL dump file called sakila_dump.sql for the Sakila database.
