@@ -1,3 +1,10 @@
+# Context: Sakila rental DB (customer -> rental -> payment, via inventory/film, store/staff/address).
+# Base data is too small and too even (599 customers, ~16k rentals) to show plan differences.
+# This script adds 1k customers / 100k rentals+payments with skew:
+# - hot customers (Pareto): few customers own most rentals -> tests JOIN on customer_id.
+# - weekend + Nov-Dec peaks: rental_date clusters -> tests date-range filters and GROUP BY.
+# - late returns (70/20/10) + late fees: return_date/payment spread -> tests overdue and fee queries.
+# Effect on DB: bigger tables + uneven rows so EXPLAIN shows index vs seq-scan clearly.
 import random
 from datetime import datetime, timedelta
 
@@ -36,6 +43,8 @@ LAST_NAMES = [
 ]
 
 
+# Why: more rentals on Fri/Sat to mimic real peaks.
+# Effect on DB: date filters return uneven rows, shows when index helps.
 def weighted_weekday_date(reference_date):
     """Shift a random date to land on Friday/Saturday ~30% of the time."""
     candidate = reference_date
@@ -46,6 +55,8 @@ def weighted_weekday_date(reference_date):
     return candidate
 
 
+# Why: more rentals in Nov-Dec holiday peak.
+# Effect on DB: date-range queries hit hot months.
 def seasonal_month_weight(month):
     """Return a weight multiplier for a given month. Nov-Dec get a boost."""
     weights = {
@@ -55,6 +66,8 @@ def seasonal_month_weight(month):
     return weights.get(month, 1.0)
 
 
+# Why: combine weekend + holiday skew into rental_date.
+# Effect on DB: bigger rental table for join testing.
 def generate_seasonal_date(base_date):
     """Generate a date weighted toward weekends and Nov-Dec."""
     for _ in range(20):
@@ -65,6 +78,8 @@ def generate_seasonal_date(base_date):
     return weighted_weekday_date(base_date - timedelta(days=random.uniform(0, 365)))
 
 
+# Why: mostly on-time returns, some late.
+# Effect on DB: overdue queries return few rows.
 def generate_return_date(rental_date):
     """Return date: 70% on-time, 20% moderately late, 10% very late."""
     roll = random.random()
@@ -77,6 +92,9 @@ def generate_return_date(rental_date):
     return rental_date + timedelta(days=days)
 
 
+# Why: make 1k customers / 100k rentals+payments with few hot customers (Pareto).
+# Pareto means pow(random.random(), 2.5) pushes most picks toward few IDs, so few customers own most rentals.
+# Effect on DB: customer joins have skew, shows join plan differences.
 def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rentals=100000):
     random.seed(42)
 
