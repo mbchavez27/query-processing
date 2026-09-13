@@ -81,7 +81,7 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
     random.seed(42)
 
     start_customer_id = 600
-    start_rental_id = 16045
+    start_rental_id = 16050
 
     with open(filename, "w") as f:
         f.write("-- ==========================================================\n")
@@ -97,7 +97,9 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
             fname = random.choice(FIRST_NAMES)
             lname = random.choice(LAST_NAMES)
             email = f"{fname.lower()}.{lname.lower()}{c_id}@example.com"
-            address_id = random.randint(1, 599)
+            # Sakila address table has gaps at 257 and 518
+            valid_address_ids = [a for a in range(1, 600) if a not in (257, 518)]
+            address_id = random.choice(valid_address_ids)
             active = 'true' if random.random() > 0.05 else 'false'
             create_date = datetime.now() - timedelta(days=random.uniform(1, 365))
 
