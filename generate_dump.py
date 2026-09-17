@@ -1,10 +1,3 @@
-# Context: Sakila rental DB (customer -> rental -> payment, via inventory/film, store/staff/address).
-# Base data is too small and too even (599 customers, ~16k rentals) to show plan differences.
-# This script adds 1k customers / 100k rentals+payments with skew:
-# - hot customers (Pareto): few customers own most rentals -> tests JOIN on customer_id.
-# - weekend + Nov-Dec peaks: rental_date clusters -> tests date-range filters and GROUP BY.
-# - late returns (70/20/10) + late fees: return_date/payment spread -> tests overdue and fee queries.
-# Effect on DB: bigger tables + uneven rows so EXPLAIN shows index vs seq-scan clearly.
 import random
 from datetime import datetime, timedelta
 
@@ -43,8 +36,6 @@ LAST_NAMES = [
 ]
 
 
-# Why: more rentals on Fri/Sat to mimic real peaks.
-# Effect on DB: date filters return uneven rows, shows when index helps.
 def weighted_weekday_date(reference_date):
     """Shift a random date to land on Friday/Saturday ~30% of the time."""
     candidate = reference_date
@@ -106,6 +97,9 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
         f.write("-- Synthetic Data Dump generated for Sakila Database\n")
         f.write("-- ==========================================================\n")
         f.write("BEGIN;\n\n")
+
+        # Suppress foreign key triggers during import
+        f.write("SET session_replication_role = 'replica';\n\n")
 
         # 1. Generate Customers
         f.write("-- 1. Inserting customers\n")
@@ -178,9 +172,11 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
         f.write("\n-- 4. Resetting Auto-Increment Sequences\n")
         f.write("SELECT setval('customer_customer_id_seq', (SELECT MAX(customer_id) FROM customer));\n")
         f.write("SELECT setval('rental_rental_id_seq', (SELECT MAX(rental_id) FROM rental));\n")
-        f.write("SELECT setval('payment_payment_id_seq', (SELECT MAX(payment_id) FROM payment));\n")
+        f.write("SELECT setval('payment_payment_id_seq', (SELECT COALESCE(MAX(payment_id), 1) FROM payment));\n")
 
-        f.write("\nCOMMIT;\n")
+        # Re-enable constraint enforcement
+        f.write("\nSET session_replication_role = 'origin';\n")
+        f.write("COMMIT;\n")
 
     print(f"Dump file '{filename}' generated successfully!")
 
