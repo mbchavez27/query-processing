@@ -98,8 +98,6 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
         f.write("-- ==========================================================\n")
         f.write("BEGIN;\n\n")
 
-        # Suppress foreign key triggers during import
-        f.write("SET session_replication_role = 'replica';\n\n")
 
         # 1. Generate Customers
         f.write("-- 1. Inserting customers\n")
@@ -174,8 +172,6 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
         f.write("SELECT setval('rental_rental_id_seq', (SELECT MAX(rental_id) FROM rental));\n")
         f.write("SELECT setval('payment_payment_id_seq', (SELECT COALESCE(MAX(payment_id), 1) FROM payment));\n")
 
-        # Re-enable constraint enforcement
-        f.write("\nSET session_replication_role = 'origin';\n")
         f.write("COMMIT;\n")
 
     print(f"Dump file '{filename}' generated successfully!")

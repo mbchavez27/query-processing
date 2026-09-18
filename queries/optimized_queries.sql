@@ -1,3 +1,166 @@
+-- ============================================================================
+-- STADVDB HO 01: OPTIMIZED ANALYTICAL QUERIES & EXPLAIN SUITE
+-- Database: PostgreSQL 15 (Sakila Dataset with 100,000 Rentals & Payments)
+-- Task 2: Optimization + Benchmark Table for Comparison
+-- ============================================================================
+
+
+-- ----------------------------------------------------------------------------
+-- QUERY 1: Genre Leaderboard — Revenue & Return Speed
+-- (Formal: Film Category Commercial Performance & Velocity)
+-- ----------------------------------------------------------------------------
+-- EXPLAIN (Baseline Bottleneck) Insights:
+--   Slow sequential scans (Seq Scan) across 100,000 rentals and payments 
+--   because there are no secondary indexes on the foreign keys.
+--
+-- Optimization Techniques:
+--   Early aggregation using a CTE to summarize 100k+ rentals and payments 
+--   down to ~1,000 films first, eliminating the unneeded film table join, 
+--   and summing the raw interval so EXTRACT runs once instead of per row.
+--
+-- EXPLAIN (Optimized) Insights:
+--   Roughly half the execution time and fewer buffers read. The aggregate 
+--   now runs on narrow rows and the outer joins touch only ~1,000 rows. 
+--
+-- Supporting Course References:
+--   • Slides 02: Slides 19 & 26 (Reduce intermediate results before joining)
+--   • Slides 02a: Slide 22 (Joins are expensive; remove unneeded joins)
+--   • Slides 02b: Slides 11 & 17 (Full scans without indexes; verify via EXPLAIN)
+--   • Slides 02b: Slides 15–16 (Indexes only help with a search condition)
+--   • Slides 02b: Slides 22–25 (Denormalization for reporting queries)
+-- ----------------------------------------------------------------------------
+
+-- [Indexed Columns for Optimization]
+CREATE INDEX IF NOT EXISTS idx_rental_inv_cover 
+ON rental (inventory_id) 
+INCLUDE (rental_id, rental_date, return_date);
+
+CREATE INDEX IF NOT EXISTS idx_payment_rental_cover 
+ON payment (rental_id) 
+INCLUDE (amount);
+
+-- [1A. Run Query (Raw Results)]
+WITH film_stats AS (
+    SELECT i.film_id,
+           COUNT(r.rental_id) AS total_rentals,
+           SUM(p.amount) AS total_revenue,
+           COUNT(r.return_date) AS returned_cnt,
+           SUM(r.return_date - r.rental_date) AS return_interval 
+    FROM rental r
+    JOIN payment p ON p.rental_id = r.rental_id
+    JOIN inventory i ON i.inventory_id = r.inventory_id      
+    GROUP BY i.film_id           
+)
+SELECT c.name AS category_name,
+       SUM(s.total_rentals) AS total_rentals,
+       SUM(s.total_revenue) AS total_revenue,
+       ROUND((EXTRACT(EPOCH FROM SUM(s.return_interval)) / NULLIF(SUM(s.returned_cnt),0) / 86400)::numeric, 2) AS avg_rental_days
+FROM film_stats s
+JOIN film_category fc ON fc.film_id = s.film_id
+JOIN category c ON c.category_id = fc.category_id
+GROUP BY c.category_id, c.name
+ORDER BY total_revenue DESC;
+
+-- [1B. Inspect Execution Plan (EXPLAIN)]
+EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)
+WITH film_stats AS (
+    SELECT i.film_id,
+           COUNT(r.rental_id) AS total_rentals,
+           SUM(p.amount) AS total_revenue,
+           COUNT(r.return_date) AS returned_cnt,
+           SUM(r.return_date - r.rental_date) AS return_interval 
+    FROM rental r
+    JOIN payment p ON p.rental_id = r.rental_id
+    JOIN inventory i ON i.inventory_id = r.inventory_id      
+    GROUP BY i.film_id           
+)
+SELECT c.name AS category_name,
+       SUM(s.total_rentals) AS total_rentals,
+       SUM(s.total_revenue) AS total_revenue,
+       ROUND((EXTRACT(EPOCH FROM SUM(s.return_interval)) / NULLIF(SUM(s.returned_cnt),0) / 86400)::numeric, 2) AS avg_rental_days
+FROM film_stats s
+JOIN film_category fc ON fc.film_id = s.film_id
+JOIN category c ON c.category_id = fc.category_id
+GROUP BY c.category_id, c.name
+ORDER BY total_revenue DESC;
+
+
+-- ----------------------------------------------------------------------------
+-- QUERY 2: Top 50 VIP Spenders by City
+-- (Formal: Customer Lifetime Value & Geographic Cohorts)
+-- ----------------------------------------------------------------------------
+-- EXPLAIN (Baseline Bottleneck) Insights:
+--   The database must scan all 100,000 payments, calculate lifetime totals 
+--   for all 1,000 customers, and sort the entire list just to keep the top 50.
+--
+-- Optimization Techniques:
+--   Early aggregation and limit pushdown using a CTE to summarize 116k rows 
+--   down to the top 50 customers first, eliminating joining geographic and 
+--   customer details across the full dataset, and adding a covering index 
+--   on payment(customer_id, amount).
+--
+-- EXPLAIN (Optimized) Insights:
+--   Speed improved greatly because grouping first and applying LIMIT 50 cuts 
+--   down the customer, address, and city joins to just 50 rows instead of 
+--   joining all 100k+ payments.
+--
+-- Supporting Course References:
+--   • Slides 02: Slides 19 & 26 (Aggregate/reduce before joining to shrink intermediate results)
+--   • Slides 02: Slide 32 (Cost of sorting; sort only the ~1,000 aggregated rows, not the joined set)
+--   • Slides 02a: Slide 22 (Joins are expensive; join only the 50 surviving rows)
+--   • Slides 02b: Slides 11–14 (Secondary index on the FK/join column payment(customer_id))
+--   • Slides 02b: Slide 16 (Index only frequently searched columns, not every column)
+--   • Slides 02b: Slide 17 (Verify index usage via EXPLAIN)
+--   • Slides 02b: Slide 26 (Reformulating with a subquery/CTE)
+-- ----------------------------------------------------------------------------
+
+-- [2A. Run Query (Raw Results)]
+WITH top_50_spenders AS (
+    SELECT p.customer_id,
+           COUNT(p.payment_id) AS transaction_count,
+           SUM(p.amount) AS total_spend,
+           ROUND(AVG(p.amount)::numeric, 2) AS avg_ticket_size
+    FROM payment p
+    GROUP BY p.customer_id
+    ORDER BY total_spend DESC
+    LIMIT 50
+)
+SELECT t.customer_id,
+       cu.first_name || ' ' || cu.last_name AS customer_name,
+       ci.city,
+       t.transaction_count,
+       t.total_spend,
+       t.avg_ticket_size
+FROM top_50_spenders t
+JOIN customer cu ON t.customer_id = cu.customer_id
+JOIN address a ON cu.address_id = a.address_id
+JOIN city ci ON a.city_id = ci.city_id
+ORDER BY t.total_spend DESC;
+
+-- [2B. Inspect Execution Plan (EXPLAIN)]
+EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)
+WITH top_50_spenders AS (
+    SELECT p.customer_id,
+           COUNT(p.payment_id) AS transaction_count,
+           SUM(p.amount) AS total_spend,
+           ROUND(AVG(p.amount)::numeric, 2) AS avg_ticket_size
+    FROM payment p
+    GROUP BY p.customer_id
+    ORDER BY total_spend DESC
+    LIMIT 50
+)
+SELECT t.customer_id,
+       cu.first_name || ' ' || cu.last_name AS customer_name,
+       ci.city,
+       t.transaction_count,
+       t.total_spend,
+       t.avg_ticket_size
+FROM top_50_spenders t
+JOIN customer cu ON t.customer_id = cu.customer_id
+JOIN address a ON cu.address_id = a.address_id
+JOIN city ci ON a.city_id = ci.city_id
+ORDER BY t.total_spend DESC;
+
 -- ----------------------------------------------------------------------------
 -- QUERY 3: Genre Blockbusters — Movies Beating the Category Average
 -- (Formal: Mandatory Correlated Subquery Benchmark Analysis)
@@ -130,7 +293,7 @@ ORDER BY film_revenue DESC;
 
 -- [4A. Optimized Query — Denormalization (Slides 22-25) + Secondary Index (Slides 8-16)]
 -- Precompute the aggregate once, following the CREATE TABLE AS pattern from Slide 25
-CREATE TABLE staff_quarterly_summary AS
+CREATE TABLE IF NOT EXISTS staff_quarterly_summary AS
 SELECT r.staff_id,
        EXTRACT(YEAR FROM r.rental_date)::int AS rental_year,
        EXTRACT(QUARTER FROM r.rental_date)::int AS rental_quarter,
@@ -141,7 +304,7 @@ JOIN payment p ON r.rental_id = p.rental_id
 GROUP BY r.staff_id, rental_year, rental_quarter;
 
 -- CREATE TABLE AS produces no indexes, so add a secondary index (Slide 12)
-CREATE INDEX idx_sqs_staff ON staff_quarterly_summary (staff_id, rental_year, rental_quarter);
+CREATE INDEX IF NOT EXISTS idx_sqs_staff ON staff_quarterly_summary (staff_id, rental_year, rental_quarter);
 
 SELECT sqs.staff_id,
        s.first_name || ' ' || s.last_name AS staff_name,
