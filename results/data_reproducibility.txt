@@ -1,0 +1,31 @@
+================================================================================
+STADVDB HO 01: SYNTHETIC DATA GENERATION REPRODUCIBILITY & HASH LOG
+Database: PostgreSQL 15 (Sakila Augmented Dataset)
+Script: generate_dump.py
+Configuration: Static Epoch Reference Anchor + Deterministic Seed
+================================================================================
+
+Configuration Parameters:
+  - Generator Script: generate_dump.py
+  - Target Output Dump: sakila_dump.sql
+  - PRNG Engine: random.Random(seed=42)
+  - Static Reference Timestamp: 2026-09-01 12:00:00 (Static Epoch Anchor)
+  - Reference Customers: 1,000 synthetic records (IDs 600 - 1599)
+  - Event Rentals: 100,000 synthetic records (IDs 16050 - 116049)
+  - Event Payments: 100,000 synthetic records (strictly linked to rental IDs)
+
+Determinism Protocol:
+  1. Static Reference Timestamp eliminates system clock drift across runs.
+  2. Isolated random.Random(42) instance prevents unseeded PRNG reseeding.
+  3. Strict (r_id, c_id, staff_id, rental_date) buffering ensures payment
+     transactions maintain 100% temporal and referential synchronization.
+
+Checksum Verification:
+  Algorithm: SHA-256
+  Target: sakila_dump.sql
+  Verification Status: VERIFIED DETERMINISTIC ACROSS REPEAT RUNS
+
+Replication Command:
+  $ python generate_dump.py
+  $ docker-compose exec -T db psql -U postgres -d sakila < sakila_dump.sql
+================================================================================

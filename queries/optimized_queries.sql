@@ -327,3 +327,64 @@ SELECT sqs.staff_id,
 FROM staff_quarterly_summary sqs
 JOIN staff s ON sqs.staff_id = s.staff_id
 ORDER BY sqs.rental_year DESC, sqs.rental_quarter DESC, sqs.total_payments_collected DESC;
+
+
+-- ----------------------------------------------------------------------------
+-- QUERY 5 (ENGINEERING ADDENDUM): Store Inventory Turnover & Overdue Exposure
+-- (Formal: Rating-Level Commercial Throughput & Late-Return Risk Analysis)
+-- ----------------------------------------------------------------------------
+-- Optimization Techniques:
+--   Early aggregation using an inventory-level CTE (inv_stats). Summarizes 
+--   116k rentals and payments down to ~4,581 inventory records first, 
+--   pruning the massive join graph before touching the store and film tables.
+--
+-- Supporting Course References:
+--   • Slides 02: Slide 19 (Pushing selections and projections down before joins)
+--   • Slides 02: Slide 26 (Aggregate/reduce before joining to shrink intermediate results)
+--   • Slides 02a: Slide 22 (Reducing intermediate relations in Cartesian products and joins)
+-- ----------------------------------------------------------------------------
+
+-- [5A. Run Query (Raw Results)]
+WITH inv_stats AS (
+    SELECT r.inventory_id,
+           COUNT(r.rental_id) AS total_rentals,
+           SUM(p.amount) AS total_revenue,
+           COUNT(CASE WHEN r.return_date > r.rental_date + INTERVAL '7 days' THEN 1 END) AS late_returns
+    FROM rental r
+    JOIN payment p ON r.rental_id = p.rental_id
+    GROUP BY r.inventory_id
+)
+SELECT i.store_id,
+       f.rating,
+       COUNT(DISTINCT f.film_id) AS distinct_titles,
+       SUM(inv.total_rentals) AS total_rentals,
+       SUM(inv.total_revenue) AS total_revenue,
+       SUM(inv.late_returns) AS late_returns
+FROM inv_stats inv
+JOIN inventory i ON inv.inventory_id = i.inventory_id
+JOIN film f ON i.film_id = f.film_id
+GROUP BY i.store_id, f.rating
+ORDER BY i.store_id ASC, total_revenue DESC;
+
+-- [5B. Inspect Execution Plan (EXPLAIN)]
+EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)
+WITH inv_stats AS (
+    SELECT r.inventory_id,
+           COUNT(r.rental_id) AS total_rentals,
+           SUM(p.amount) AS total_revenue,
+           COUNT(CASE WHEN r.return_date > r.rental_date + INTERVAL '7 days' THEN 1 END) AS late_returns
+    FROM rental r
+    JOIN payment p ON r.rental_id = p.rental_id
+    GROUP BY r.inventory_id
+)
+SELECT i.store_id,
+       f.rating,
+       COUNT(DISTINCT f.film_id) AS distinct_titles,
+       SUM(inv.total_rentals) AS total_rentals,
+       SUM(inv.total_revenue) AS total_revenue,
+       SUM(inv.late_returns) AS late_returns
+FROM inv_stats inv
+JOIN inventory i ON inv.inventory_id = i.inventory_id
+JOIN film f ON i.film_id = f.film_id
+GROUP BY i.store_id, f.rating
+ORDER BY i.store_id ASC, total_revenue DESC;

@@ -252,3 +252,54 @@ JOIN rental r ON s.staff_id = r.staff_id
 JOIN payment p ON r.rental_id = p.rental_id
 GROUP BY s.staff_id, staff_name, rental_year, rental_quarter
 ORDER BY rental_year DESC, rental_quarter DESC, total_payments_collected DESC;
+
+
+-- ----------------------------------------------------------------------------
+-- QUERY 5 (ENGINEERING ADDENDUM): Store Inventory Turnover & Overdue Exposure
+-- (Formal: Rating-Level Commercial Throughput & Late-Return Risk Analysis)
+-- ----------------------------------------------------------------------------
+-- Purpose & Rationale:
+--   Addresses Section A.2 of the project deliverables ("five analytical queries").
+--   Analyzes movie performance across stores by MPAA rating, evaluating
+--   total rental count, total revenue, and the volume of late returns (>7 days).
+--
+-- Tables Joined (5 Tables):
+--   store -> inventory -> film -> rental -> payment (5 tables joined)
+--
+-- EXPLAIN (Baseline Bottleneck) Insights:
+--   Multi-table hash join across two 116k-row transaction tables without
+--   pre-filtering, plus repeated conditional CASE evaluation per row,
+--   forcing extensive parallel seq scans and memory-heavy hashing.
+-- ----------------------------------------------------------------------------
+
+-- [5A. Run Query (Raw Results)]
+SELECT st.store_id,
+       f.rating,
+       COUNT(DISTINCT f.film_id) AS distinct_titles,
+       COUNT(r.rental_id) AS total_rentals,
+       SUM(p.amount) AS total_revenue,
+       COUNT(CASE WHEN r.return_date > r.rental_date + INTERVAL '7 days' THEN 1 END) AS late_returns
+FROM store st
+JOIN inventory i ON st.store_id = i.store_id
+JOIN film f ON i.film_id = f.film_id
+JOIN rental r ON i.inventory_id = r.inventory_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY st.store_id, f.rating
+ORDER BY st.store_id ASC, total_revenue DESC;
+
+-- [5B. Inspect Execution Plan (EXPLAIN)]
+EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)
+SELECT st.store_id,
+       f.rating,
+       COUNT(DISTINCT f.film_id) AS distinct_titles,
+       COUNT(r.rental_id) AS total_rentals,
+       SUM(p.amount) AS total_revenue,
+       COUNT(CASE WHEN r.return_date > r.rental_date + INTERVAL '7 days' THEN 1 END) AS late_returns
+FROM store st
+JOIN inventory i ON st.store_id = i.store_id
+JOIN film f ON i.film_id = f.film_id
+JOIN rental r ON i.inventory_id = r.inventory_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY st.store_id, f.rating
+ORDER BY st.store_id ASC, total_revenue DESC;
+

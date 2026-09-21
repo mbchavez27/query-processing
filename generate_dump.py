@@ -35,19 +35,19 @@ LAST_NAMES = [
     'Russell', 'Sullivan', 'Bell', 'Coleman', 'Butler', 'Henderson', 'Barnes', 'Gonzales',
 ]
 
+STATIC_REFERENCE_TIMESTAMP = datetime(2026, 9, 1, 12, 0, 0)
 
-def weighted_weekday_date(reference_date):
+
+def weighted_weekday_date(reference_date, rng):
     """Shift a random date to land on Friday/Saturday ~30% of the time."""
     candidate = reference_date
-    if random.random() < 0.30:
+    if rng.random() < 0.30:
         days_to_fri = (4 - candidate.weekday()) % 7
         days_to_sat = (5 - candidate.weekday()) % 7
         candidate = candidate + timedelta(days=min(days_to_fri, days_to_sat))
     return candidate
 
 
-# Why: more rentals in Nov-Dec holiday peak.
-# Effect on DB: date-range queries hit hot months.
 def seasonal_month_weight(month):
     """Return a weight multiplier for a given month. Nov-Dec get a boost."""
     weights = {
@@ -57,109 +57,105 @@ def seasonal_month_weight(month):
     return weights.get(month, 1.0)
 
 
-# Why: combine weekend + holiday skew into rental_date.
-# Effect on DB: bigger rental table for join testing.
-def generate_seasonal_date(base_date):
+def generate_seasonal_date(base_date, rng):
     """Generate a date weighted toward weekends and Nov-Dec."""
     for _ in range(20):
-        candidate = base_date - timedelta(days=random.uniform(0, 365))
+        candidate = base_date - timedelta(days=rng.uniform(0, 365))
         weight = seasonal_month_weight(candidate.month)
-        if random.random() < weight / 1.3:
-            return weighted_weekday_date(candidate)
-    return weighted_weekday_date(base_date - timedelta(days=random.uniform(0, 365)))
+        if rng.random() < weight / 1.3:
+            return weighted_weekday_date(candidate, rng)
+    return weighted_weekday_date(base_date - timedelta(days=rng.uniform(0, 365)), rng)
 
 
-# Why: mostly on-time returns, some late.
-# Effect on DB: overdue queries return few rows.
-def generate_return_date(rental_date):
+def generate_return_date(rental_date, rng):
     """Return date: 70% on-time, 20% moderately late, 10% very late."""
-    roll = random.random()
+    roll = rng.random()
     if roll < 0.70:
-        days = random.randint(1, 3)
+        days = rng.randint(1, 3)
     elif roll < 0.90:
-        days = random.randint(4, 10)
+        days = rng.randint(4, 10)
     else:
-        days = random.randint(11, 30)
+        days = rng.randint(11, 30)
     return rental_date + timedelta(days=days)
 
 
-# Why: make 1k customers / 100k rentals+payments with few hot customers (Pareto).
-# Pareto means pow(random.random(), 2.5) pushes most picks toward few IDs, so few customers own most rentals.
-# Effect on DB: customer joins have skew, shows join plan differences.
-def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rentals=100000):
-    random.seed(42)
+def generate_sql_dump(
+    filename="sakila_dump.sql",
+    num_customers=1000,
+    num_rentals=100000,
+    seed=42,
+    reference_date=STATIC_REFERENCE_TIMESTAMP,
+):
+    """
+    Generate synthetic data adhering to the Pareto distribution, temporal skew,
+    and referential integrity constraints. Uses a dedicated random.Random(seed)
+    instance and a static reference date to ensure bit-for-bit reproducibility.
+    """
+    rng = random.Random(seed)
 
     start_customer_id = 600
     start_rental_id = 16050
 
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("-- ==========================================================\n")
         f.write("-- Synthetic Data Dump generated for Sakila Database\n")
+        f.write(f"-- Reference Date: {reference_date.strftime('%Y-%m-%d %H:%M:%S')} (Static Epoch)\n")
+        f.write(f"-- Seed: {seed} (Deterministic PRNG)\n")
         f.write("-- ==========================================================\n")
         f.write("BEGIN;\n\n")
 
-
         # 1. Generate Customers
-        f.write("-- 1. Inserting customers\n")
+        f.write("-- 1. Inserting customers (1,000 synthetic records: IDs 600-1599)\n")
+        valid_address_ids = [a for a in range(1, 600) if a not in (257, 518)]
         for i in range(num_customers):
             c_id = start_customer_id + i
-            store_id = random.randint(1, 2)
-            fname = random.choice(FIRST_NAMES)
-            lname = random.choice(LAST_NAMES)
+            store_id = rng.randint(1, 2)
+            fname = rng.choice(FIRST_NAMES)
+            lname = rng.choice(LAST_NAMES)
             email = f"{fname.lower()}.{lname.lower()}{c_id}@example.com"
-            # Sakila address table has gaps at 257 and 518
-            valid_address_ids = [a for a in range(1, 600) if a not in (257, 518)]
-            address_id = random.choice(valid_address_ids)
-            active = 'true' if random.random() > 0.05 else 'false'
-            create_date = datetime.now() - timedelta(days=random.uniform(1, 365))
+            address_id = rng.choice(valid_address_ids)
+            active = 'true' if rng.random() > 0.05 else 'false'
+            create_date = reference_date - timedelta(days=rng.uniform(1, 365))
 
             f.write(
                 f"INSERT INTO customer (customer_id, store_id, first_name, last_name, email, address_id, activebool, create_date) "
                 f"VALUES ({c_id}, {store_id}, '{fname}', '{lname}', '{email}', {address_id}, {active}, '{create_date.strftime('%Y-%m-%d')}');\n"
             )
 
-        # 2. Generate Rentals
-        f.write("\n-- 2. Inserting rentals\n")
+        # 2. Generate Rentals & Buffer for Strictly Linked Payments
+        f.write("\n-- 2. Inserting rentals (100,000 synthetic records: IDs 16050-116049)\n")
+        rentals_buffer = []
         for i in range(num_rentals):
             r_id = start_rental_id + i
-            c_id = int(start_customer_id + (pow(random.random(), 2.5) * (num_customers - 1)))
-            inv_id = random.randint(1, 4581)
-            staff_id = random.randint(1, 2)
+            c_id = int(start_customer_id + (pow(rng.random(), 2.5) * (num_customers - 1)))
+            inv_id = rng.randint(1, 4581)
+            staff_id = rng.randint(1, 2)
 
-            rental_date = generate_seasonal_date(datetime.now())
-            return_date = generate_return_date(rental_date)
+            rental_date = generate_seasonal_date(reference_date, rng)
+            return_date = generate_return_date(rental_date, rng)
+
+            rentals_buffer.append((r_id, c_id, staff_id, rental_date))
 
             f.write(
                 f"INSERT INTO rental (rental_id, rental_date, inventory_id, customer_id, return_date, staff_id) "
                 f"VALUES ({r_id}, '{rental_date.strftime('%Y-%m-%d %H:%M:%S')}', {inv_id}, {c_id}, '{return_date.strftime('%Y-%m-%d %H:%M:%S')}', {staff_id});\n"
             )
 
-        # 3. Generate Payments (correlated with rental dates)
-        f.write("\n-- 3. Inserting payments\n")
+        # 3. Generate Payments (strictly correlated with rental records)
+        f.write("\n-- 3. Inserting payments (100,000 synthetic records: strictly linked to rentals)\n")
         tier_prices = [0.99, 2.99, 4.99]
-        for i in range(num_rentals):
-            r_id = start_rental_id + i
-            random.seed(r_id)
-            c_id = int(start_customer_id + (pow(random.random(), 2.5) * (num_customers - 1)))
-            random.seed()
-
-            staff_id = random.randint(1, 2)
-            base_price = random.choice(tier_prices)
-            late_fee = round(random.uniform(1, 5), 2) if random.random() > 0.85 else 0.0
+        for r_id, c_id, staff_id, rental_date in rentals_buffer:
+            base_price = rng.choice(tier_prices)
+            late_fee = round(rng.uniform(1, 5), 2) if rng.random() > 0.85 else 0.0
             amount = round(base_price + late_fee, 2)
 
             # Payment within 0-3 days of rental; 5% chance of 7-14 day delay
-            if random.random() < 0.05:
-                payment_delay = random.randint(7, 14)
+            if rng.random() < 0.05:
+                payment_delay = rng.randint(7, 14)
             else:
-                payment_delay = random.randint(0, 3)
+                payment_delay = rng.randint(0, 3)
 
-            # Reconstruct rental_date seed to derive consistent payment_date
-            random.seed(r_id)
-            c_id_check = int(start_customer_id + (pow(random.random(), 2.5) * (num_customers - 1)))
-            random.seed()
-            rental_date_approx = datetime.now() - timedelta(days=random.uniform(1, 365))
-            payment_date = rental_date_approx + timedelta(days=payment_delay)
+            payment_date = rental_date + timedelta(days=payment_delay)
 
             f.write(
                 f"INSERT INTO payment (customer_id, staff_id, rental_id, amount, payment_date) "
@@ -174,7 +170,7 @@ def generate_sql_dump(filename="sakila_dump.sql", num_customers=1000, num_rental
 
         f.write("COMMIT;\n")
 
-    print(f"Dump file '{filename}' generated successfully!")
+    print(f"Deterministic dump file '{filename}' generated successfully!")
 
 
 if __name__ == "__main__":

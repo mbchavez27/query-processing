@@ -81,6 +81,29 @@ The base Sakila dataset has 599 customers and ~16k rentals. For query optimizati
    docker compose exec -T postgres psql -U postgres -d postgres < sakila_dump.sql
    ```
 
+## Verification & Equivalence Suite
+
+After loading data, run the validation and equivalence suites to verify referential integrity and zero result set divergence:
+
+1. **Database Integrity & Volume Validation**:
+   ```bash
+   docker compose exec -T postgres psql -U postgres -d postgres < queries/data_validation.sql
+   ```
+   Validates 1,599 customers, 116,044 rentals, 116,049 payments, zero orphaned records, and Pareto skew.
+
+2. **Query Equivalence Suite (Bidirectional `EXCEPT ALL`)**:
+   ```bash
+   docker compose exec -T postgres psql -U postgres -d postgres < queries/equivalence_checks.sql
+   ```
+   Mathematically confirms that all analytical queries (Q1-Q5) return identical result sets (0 discrepancies).
+
+3. **Benchmarked Output Logs**:
+   - `results/baseline_explain.txt`: Baseline execution plans and timings
+   - `results/optimized_explain.txt`: Optimized execution plans and timings
+   - `results/equivalence_checks.txt`: Bidirectional equivalence execution logs (0 discrepancies)
+   - `results/data_validation.txt`: Post-load empirical scaling and integrity validation logs
+   - `results/data_reproducibility.txt`: Fixed seed and reference epoch determinism protocol
+
 ## GenAI Usage
 
 This project uses GenAI (Gemini) to generate the synthetic data script.
@@ -94,7 +117,8 @@ The script must fulfill the following requirements:
 
 Volume & Scope:
 - Insert 1,000 new customers (starting at customer_id 600) using realistic generic first and last names, emails, and address IDs (1–599).
-- Insert 100,000 new rentals (starting at rental_id 16045) and 100,000 new payments linked strictly to those rentals.
+- Insert 100,000 new rentals (starting at rental_id 16050) and 100,000 new payments linked strictly to those rentals.
+
 
 Referential Integrity & Sequences:
 - Ensure foreign keys match properly across tables.

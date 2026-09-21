@@ -1,0 +1,930 @@
+================================================================================
+STADVDB HO 01: BASELINE EXECUTION RESULTS & EXPLAIN PLANS
+Database: PostgreSQL 15 on Sakila (Augmented: 116,044 Rentals, 116,049 Payments)
+Task 1: Baseline Queries & Diagnostics Deliverable
+================================================================================
+
+
+--------------------------------------------------------------------------------
+QUERY 1: Film Category Commercial Performance & Return Speed (Genre Leaderboard)
+--------------------------------------------------------------------------------
+
+[1A. Query Results]
+ category_name | total_rentals | total_revenue | avg_rental_days 
+---------------+---------------+---------------+-----------------
+ Sports        |          8790 |      31308.62 |            4.81
+ Animation     |          8345 |      29351.45 |            4.89
+ Sci-Fi        |          7963 |      28129.50 |            4.91
+ Family        |          7970 |      27867.87 |            4.88
+ Action        |          7858 |      27840.96 |            4.87
+ Drama         |          7658 |      27399.77 |            4.85
+ Foreign       |          7549 |      26694.98 |            4.82
+ Documentary   |          7327 |      25558.87 |            4.89
+ New           |          6986 |      25200.38 |            4.85
+ Games         |          6993 |      24852.22 |            4.86
+ Comedy        |          6884 |      24750.29 |            4.93
+ Classics      |          6925 |      24136.12 |            5.02
+ Children      |          6796 |      23899.21 |            5.00
+ Horror        |          6228 |      22546.35 |            4.91
+ Travel        |          5962 |      21072.87 |            4.89
+ Music         |          5815 |      20588.06 |            4.97
+(16 rows)
+
+[1B. Execution Plan: EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)]
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=7793.43..7795.31 rows=750 width=144) (actual time=46.585..49.327 rows=16 loops=1)
+   Sort Key: (sum(p.amount)) DESC
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=2330
+   ->  Finalize GroupAggregate  (cost=7546.98..7757.62 rows=750 width=144) (actual time=46.515..49.313 rows=16 loops=1)
+         Group Key: c.category_id
+         Buffers: shared hit=2330
+         ->  Gather Merge  (cost=7546.98..7721.99 rows=1500 width=144) (actual time=46.503..49.249 rows=48 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=2330
+               ->  Sort  (cost=6546.95..6548.83 rows=750 width=144) (actual time=41.690..41.698 rows=16 loops=3)
+                     Sort Key: c.category_id
+                     Sort Method: quicksort  Memory: 28kB
+                     Buffers: shared hit=2330
+                     Worker 0:  Sort Method: quicksort  Memory: 28kB
+                     Worker 1:  Sort Method: quicksort  Memory: 28kB
+                     ->  Partial HashAggregate  (cost=6499.89..6511.14 rows=750 width=144) (actual time=41.625..41.639 rows=16 loops=3)
+                           Group Key: c.category_id
+                           Batches: 1  Memory Usage: 57kB
+                           Buffers: shared hit=2316
+                           Worker 0:  Batches: 1  Memory Usage: 57kB
+                           Worker 1:  Batches: 1  Memory Usage: 57kB
+                           ->  Hash Join  (cost=2954.21..5653.55 rows=48362 width=98) (actual time=12.227..30.400 rows=38683 loops=3)
+                                 Hash Cond: (r.inventory_id = i.inventory_id)
+                                 Buffers: shared hit=2316
+                                 ->  Parallel Hash Join  (cost=2620.87..4655.24 rows=48362 width=30) (actual time=9.869..22.644 rows=38683 loops=3)
+                                       Hash Cond: (p.rental_id = r.rental_id)
+                                       Buffers: shared hit=1939
+                                       ->  Parallel Append  (cost=0.00..1899.10 rows=51528 width=10) (actual time=0.009..4.880 rows=38683 loops=3)
+                                             Buffers: shared hit=854
+                                             ->  Parallel Seq Scan on payment p_1  (cost=0.00..1536.64 rows=68264 width=10) (actual time=0.006..2.911 rows=38683 loops=3)
+                                                   Buffers: shared hit=854
+                                             ->  Parallel Seq Scan on payment_p2007_01 p_2  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                             ->  Parallel Seq Scan on payment_p2007_02 p_3  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                             ->  Parallel Seq Scan on payment_p2007_03 p_4  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                             ->  Parallel Seq Scan on payment_p2007_04 p_5  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                             ->  Parallel Seq Scan on payment_p2007_05 p_6  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                             ->  Parallel Seq Scan on payment_p2007_06 p_7  (cost=0.00..17.47 rows=747 width=16) (actual time=0.002..0.002 rows=0 loops=1)
+                                       ->  Parallel Hash  (cost=1767.61..1767.61 rows=68261 width=24) (actual time=9.442..9.443 rows=38681 loops=3)
+                                             Buckets: 131072  Batches: 1  Memory Usage: 8320kB
+                                             Buffers: shared hit=1085
+                                             ->  Parallel Seq Scan on rental r  (cost=0.00..1767.61 rows=68261 width=24) (actual time=0.008..2.639 rows=38681 loops=3)
+                                                   Buffers: shared hit=1085
+                                 ->  Hash  (cost=276.07..276.07 rows=4581 width=76) (actual time=2.296..2.299 rows=4581 loops=3)
+                                       Buckets: 8192  Batches: 1  Memory Usage: 283kB
+                                       Buffers: shared hit=371
+                                       ->  Hash Join  (cost=137.28..276.07 rows=4581 width=76) (actual time=0.878..1.707 rows=4581 loops=3)
+                                             Hash Cond: (i.film_id = fc.film_id)
+                                             Buffers: shared hit=371
+                                             ->  Seq Scan on inventory i  (cost=0.00..75.81 rows=4581 width=8) (actual time=0.014..0.228 rows=4581 loops=3)
+                                                   Buffers: shared hit=90
+                                             ->  Hash  (cost=124.78..124.78 rows=1000 width=80) (actual time=0.847..0.849 rows=1000 loops=3)
+                                                   Buckets: 1024  Batches: 1  Memory Usage: 60kB
+                                                   Buffers: shared hit=281
+                                                   ->  Hash Join  (cost=77.66..124.78 rows=1000 width=80) (actual time=0.247..0.694 rows=1000 loops=3)
+                                                         Hash Cond: (fc.film_id = f.film_id)
+                                                         Buffers: shared hit=281
+                                                         ->  Nested Loop  (cost=0.16..44.64 rows=1000 width=76) (actual time=0.029..0.351 rows=1000 loops=3)
+                                                               Buffers: shared hit=116
+                                                               ->  Seq Scan on film_category fc  (cost=0.00..16.00 rows=1000 width=8) (actual time=0.009..0.060 rows=1000 loops=3)
+                                                                     Buffers: shared hit=18
+                                                               ->  Memoize  (cost=0.16..0.23 rows=1 width=72) (actual time=0.000..0.000 rows=1 loops=3000)
+                                                                     Cache Key: fc.category_id
+                                                                     Cache Mode: logical
+                                                                     Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                                     Buffers: shared hit=98
+                                                                     Worker 0:  Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                                     Worker 1:  Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                                     ->  Index Scan using category_pkey on category c  (cost=0.15..0.22 rows=1 width=72) (actual time=0.001..0.001 rows=1 loops=48)
+                                                                           Index Cond: (category_id = fc.category_id)
+                                                                           Buffers: shared hit=98
+                                                         ->  Hash  (cost=65.00..65.00 rows=1000 width=4) (actual time=0.198..0.198 rows=1000 loops=3)
+                                                               Buckets: 1024  Batches: 1  Memory Usage: 44kB
+                                                               Buffers: shared hit=165
+                                                               ->  Seq Scan on film f  (cost=0.00..65.00 rows=1000 width=4) (actual time=0.006..0.106 rows=1000 loops=3)
+                                                                     Buffers: shared hit=165
+ Planning:
+   Buffers: shared hit=95
+ Planning Time: 1.375 ms
+ Execution Time: 49.565 ms
+(81 rows)
+
+
+--------------------------------------------------------------------------------
+QUERY 2: Customer Lifetime Value (CLV) & Geographic Cohorts (Top 50 VIPs)
+--------------------------------------------------------------------------------
+
+[2A. Query Results]
+ customer_id |   customer_name   |          city           | transaction_count | total_spend | avg_ticket_size 
+-------------+-------------------+-------------------------+-------------------+-------------+-----------------
+         600 | Patricia Patel    | Inegl                   |              6231 |    21365.53 |            3.43
+         601 | Gregory Patel     | Chatsworth              |              2077 |     7026.24 |            3.38
+         602 | Barbara Ramirez   | Buenaventura            |              1442 |     4879.20 |            3.38
+         603 | Carolyn Wood      | Chatsworth              |              1182 |     4171.71 |            3.53
+         604 | Ruth Smith        | Ljubertsy               |              1017 |     3518.29 |            3.46
+         605 | Margaret Ross     | Ede                     |               900 |     3130.68 |            3.48
+         606 | Nathan Hall       | Lengshuijiang           |               792 |     2705.91 |            3.42
+         608 | Pamela Harris     | Shivapuri               |               719 |     2533.08 |            3.52
+         607 | Timothy Hernandez | Sokoto                  |               710 |     2439.57 |            3.44
+         609 | William Barnes    | Buenaventura            |               652 |     2231.43 |            3.42
+         610 | Samantha Coleman  | Gulbarga                |               615 |     2109.63 |            3.43
+         611 | Rachel Mendoza    | al-Hawiya               |               596 |     2020.81 |            3.39
+         612 | Christopher Reyes | Tama                    |               516 |     1808.47 |            3.50
+         613 | Debra Adams       | Iwakuni                 |               533 |     1795.13 |            3.37
+         615 | Margaret Wood     | Vijayawada              |               491 |     1678.73 |            3.42
+         614 | Stephanie Wright  | Daxian                  |               503 |     1662.22 |            3.30
+         616 | Charles King      | Touliu                  |               475 |     1611.58 |            3.39
+         619 | Karen Watson      | Ljubertsy               |               442 |     1574.54 |            3.56
+         617 | Catherine Howard  | Junan                   |               429 |     1542.54 |            3.60
+         618 | Sarah Rogers      | Siliguri (Shiliguri)    |               444 |     1488.74 |            3.35
+         621 | Debra Castillo    | Duisburg                |               400 |     1396.81 |            3.49
+         620 | Deborah Carter    | Gatineau                |               417 |     1391.83 |            3.34
+         622 | Jerry Chavez      | San Lorenzo             |               382 |     1341.91 |            3.51
+         624 | Virginia Watson   | Tiefa                   |               369 |     1339.32 |            3.63
+         625 | Karen Mitchell    | Le Mans                 |               365 |     1268.45 |            3.48
+         628 | Janet Morales     | Xiangtan                |               366 |     1248.19 |            3.41
+         623 | James Castillo    | Salzburg                |               370 |     1222.81 |            3.30
+         629 | Thomas James      | Denizli                 |               344 |     1181.48 |            3.43
+         627 | Donald Davis      | San Miguel de Tucumn    |               338 |     1170.12 |            3.46
+         626 | Scott Adams       | York                    |               336 |     1155.12 |            3.44
+         635 | Patrick Kelly     | Celaya                  |               327 |     1135.64 |            3.47
+         634 | Elizabeth Rogers  | Iwaki                   |               305 |     1086.49 |            3.56
+         638 | Linda Phillips    | Nukualofa               |               315 |     1075.25 |            3.41
+         632 | Robert Ramos      | Xintai                  |               307 |     1074.48 |            3.50
+         639 | Matthew Morgan    | Ziguinchor              |               289 |     1033.93 |            3.58
+         631 | Jeffrey Gutierrez | Qomsheh                 |               296 |     1016.83 |            3.44
+         630 | Margaret Cooper   | Bhusawal                |               297 |     1011.30 |            3.41
+         633 | Alexander Watson  | Vaduz                   |               300 |      997.10 |            3.32
+         640 | Ashley Martinez   | Surakarta               |               274 |      992.90 |            3.62
+         649 | Justin Kim        | Nanyang                 |               262 |      911.64 |            3.48
+         637 | Cynthia Gonzales  | A Corua (La Corua)      |               276 |      906.21 |            3.28
+         641 | Michael Wood      | Zhoushan                |               263 |      899.63 |            3.42
+         647 | Linda Rogers      | Kamakura                |               256 |      884.74 |            3.46
+         651 | Ryan Green        | Baybay                  |               250 |      883.73 |            3.53
+         636 | Matthew Gonzalez  | Augusta-Richmond County |               261 |      876.11 |            3.36
+         643 | Lisa Carter       | Lethbridge              |               252 |      873.28 |            3.47
+         645 | Donna Ramirez     | Papeete                 |               257 |      860.17 |            3.35
+         646 | Linda Miller      | Shaoguan                |               251 |      856.46 |            3.41
+         644 | Andrew Diaz       | Tokat                   |               247 |      853.31 |            3.45
+         654 | Brandon Russell   | Baicheng                |               246 |      850.04 |            3.46
+(50 rows)
+
+[2B. Execution Plan: EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)]
+                                                                                               QUERY PLAN                                                                                                
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=27655.67..27655.80 rows=50 width=117) (actual time=124.947..124.955 rows=50 loops=1)
+   Buffers: shared hit=86509
+   ->  Sort  (cost=27655.67..27964.85 rows=123669 width=117) (actual time=124.946..124.951 rows=50 loops=1)
+         Sort Key: (sum(p.amount)) DESC
+         Sort Method: top-N heapsort  Memory: 34kB
+         Buffers: shared hit=86509
+         ->  GroupAggregate  (cost=13.63..23547.48 rows=123669 width=117) (actual time=0.139..124.443 rows=1598 loops=1)
+               Group Key: cu.customer_id, ((((cu.first_name)::text || ' '::text) || (cu.last_name)::text)), ci.city
+               Buffers: shared hit=86509
+               ->  Incremental Sort  (cost=13.63..19219.06 rows=123669 width=55) (actual time=0.095..107.746 rows=116049 loops=1)
+                     Sort Key: cu.customer_id, ((((cu.first_name)::text || ' '::text) || (cu.last_name)::text)), ci.city
+                     Presorted Key: cu.customer_id
+                     Full-sort Groups: 1319  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+                     Pre-sorted Groups: 481  Sort Method: quicksort  Average Memory: 640kB  Peak Memory: 655kB
+                     Buffers: shared hit=86509
+                     ->  Merge Join  (cost=2.70..11125.60 rows=123669 width=55) (actual time=0.063..81.069 rows=116049 loops=1)
+                           Merge Cond: (cu.customer_id = p.customer_id)
+                           Buffers: shared hit=86509
+                           ->  Nested Loop  (cost=0.85..568.83 rows=1599 width=26) (actual time=0.024..3.248 rows=1599 loops=1)
+                                 Buffers: shared hit=3635
+                                 ->  Nested Loop  (cost=0.56..317.80 rows=1599 width=21) (actual time=0.018..1.813 rows=1599 loops=1)
+                                       Buffers: shared hit=1838
+                                       ->  Index Scan using customer_pkey on customer cu  (cost=0.28..86.26 rows=1599 width=21) (actual time=0.009..0.331 rows=1599 loops=1)
+                                             Buffers: shared hit=29
+                                       ->  Memoize  (cost=0.29..0.33 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=1599)
+                                             Cache Key: cu.address_id
+                                             Cache Mode: logical
+                                             Hits: 996  Misses: 603  Evictions: 0  Overflows: 0  Memory Usage: 64kB
+                                             Buffers: shared hit=1809
+                                             ->  Index Scan using address_pkey on address a  (cost=0.28..0.32 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=603)
+                                                   Index Cond: (address_id = cu.address_id)
+                                                   Buffers: shared hit=1809
+                                 ->  Memoize  (cost=0.29..0.36 rows=1 width=13) (actual time=0.001..0.001 rows=1 loops=1599)
+                                       Cache Key: a.city_id
+                                       Cache Mode: logical
+                                       Hits: 1000  Misses: 599  Evictions: 0  Overflows: 0  Memory Usage: 68kB
+                                       Buffers: shared hit=1797
+                                       ->  Index Scan using city_pkey on city ci  (cost=0.28..0.35 rows=1 width=13) (actual time=0.001..0.001 rows=1 loops=599)
+                                             Index Cond: (city_id = a.city_id)
+                                             Buffers: shared hit=1797
+                           ->  Materialize  (cost=1.31..8388.92 rows=123669 width=14) (actual time=0.037..58.544 rows=116049 loops=1)
+                                 Buffers: shared hit=82874
+                                 ->  Merge Append  (cost=1.31..8079.75 rows=123669 width=14) (actual time=0.035..43.424 rows=116049 loops=1)
+                                       Sort Key: p.customer_id
+                                       Buffers: shared hit=82874
+                                       ->  Index Scan using idx_fk_customer_id on payment p_1  (cost=0.29..5346.18 rows=116049 width=14) (actual time=0.010..37.508 rows=116049 loops=1)
+                                             Buffers: shared hit=82868
+                                       ->  Index Scan using idx_fk_payment_p2007_01_customer_id on payment_p2007_01 p_2  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.004..0.004 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using idx_fk_payment_p2007_02_customer_id on payment_p2007_02 p_3  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.004..0.004 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using idx_fk_payment_p2007_03_customer_id on payment_p2007_03 p_4  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.005..0.005 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using idx_fk_payment_p2007_04_customer_id on payment_p2007_04 p_5  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.004..0.004 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using idx_fk_payment_p2007_05_customer_id on payment_p2007_05 p_6  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.004..0.004 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using idx_fk_payment_p2007_06_customer_id on payment_p2007_06 p_7  (cost=0.15..63.20 rows=1270 width=20) (actual time=0.005..0.005 rows=0 loops=1)
+                                             Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=61
+ Planning Time: 0.662 ms
+ Execution Time: 125.261 ms
+(63 rows)
+
+
+--------------------------------------------------------------------------------
+QUERY 3: Individual Category Blockbusters (MANDATORY CORRELATED SUBQUERY)
+--------------------------------------------------------------------------------
+
+[3A. Query Results]
+ film_id |            title            | category_name | film_revenue 
+---------+-----------------------------+---------------+--------------
+     893 | TITANS JERK                 | Sci-Fi        |       888.55
+     730 | RIDGEMONT SUBMARINE         | New           |       873.14
+     973 | WIFE TURN                   | Documentary   |       852.05
+     403 | HARRY IDAHO                 | Drama         |       836.26
+     369 | GOODFELLAS SALUTE           | Sci-Fi        |       835.63
+    1000 | ZORRO ARK                   | Comedy        |       826.86
+     767 | SCALAWAG DUCK               | Music         |       821.77
+     331 | FORWARD TEMPLE              | Games         |       810.36
+     444 | HUSTLER PARTY               | Comedy        |       801.27
+     521 | LIES TREATMENT              | Drama         |       800.70
+      73 | BINGO TALENTED              | Sci-Fi        |       797.44
+     103 | BUCKET BROTHERHOOD          | Travel        |       793.56
+     609 | MUSCLE BRIGHT               | Travel        |       787.35
+      31 | APACHE DIVINE               | Family        |       786.46
+     621 | NETWORK PEAK                | Family        |       783.29
+     856 | STREETCAR INTENTIONS        | Horror        |       771.79
+     753 | RUSH GOODFELLAS             | Family        |       768.55
+     349 | GANGS PRIDE                 | Animation     |       767.69
+     897 | TORQUE BOUND                | Drama         |       767.64
+     500 | KISS GLORY                  | Foreign       |       766.22
+     559 | MARRIED GO                  | Sci-Fi        |       763.19
+     350 | GARDEN ISLAND               | Sci-Fi        |       757.99
+     460 | INNOCENT USUAL              | Foreign       |       757.20
+     764 | SATURDAY LAMBS              | Sports        |       756.52
+     911 | TRIP NEWTON                 | Action        |       755.81
+     572 | METROPOLIS COMA             | Sci-Fi        |       755.44
+     715 | RANGE MOONWALKER            | Family        |       754.53
+     771 | SCORPION APOLLO             | Drama         |       753.09
+     382 | GRIT CLOCKWORK              | Games         |       746.43
+     873 | SWEETHEARTS SUSPECTS        | Children      |       745.90
+     773 | SEABISCUIT PUNK             | Sports        |       744.47
+     879 | TELEGRAPH VOYAGE            | Music         |       741.43
+      86 | BOOGIE AMELIE               | Music         |       738.63
+      69 | BEVERLY OUTLAW              | Sci-Fi        |       738.46
+     295 | EXPENDABLE STALLION         | Documentary   |       737.07
+     127 | CAT CONEHEADS               | Comedy        |       734.72
+     378 | GREATEST NORTH              | Music         |       734.30
+     638 | OPERATION OPERATION         | Comedy        |       731.73
+     846 | STING PERSONAL              | New           |       730.00
+     109 | BUTTERFLY CHOCOLAT          | New           |       729.86
+     361 | GLEAMING JAWBREAKER         | Sports        |       728.53
+     843 | STEEL SANTA                 | Classics      |       728.39
+     979 | WITCHES PANIC               | Drama         |       728.13
+     239 | DOGMA FAMILY                | Animation     |       727.43
+     551 | MAIDEN HOME                 | New           |       723.22
+     525 | LOATHING LEGALLY            | Classics      |       721.48
+     563 | MASSACRE USUAL              | Games         |       721.24
+     869 | SUSPECTS QUILLS             | Action        |       720.86
+     443 | HURRICANE AFFAIR            | Comedy        |       720.45
+     670 | PELICAN COMFORTS            | Documentary   |       717.14
+     468 | INVASION CYCLONE            | Children      |       716.59
+     263 | DURHAM PANKY                | Sports        |       716.02
+     738 | ROCKETEER MOTHER            | Foreign       |       714.93
+     159 | CLOSER BANG                 | Comedy        |       714.28
+     938 | VELVET TERMINATOR           | Comedy        |       714.01
+     330 | FORRESTER COMANCHEROS       | Animation     |       713.69
+     835 | SPY MILE                    | Games         |       712.85
+     625 | NONE SPIKING                | Sci-Fi        |       712.74
+     745 | ROSES TREASURE              | Sports        |       710.56
+     341 | FROST HEAD                  | Classics      |       709.95
+       4 | AFFAIR PREJUDICE            | Horror        |       706.71
+     112 | CALENDAR GUNFIGHT           | Foreign       |       706.18
+     284 | ENEMY ODDS                  | Music         |       702.50
+     880 | TELEMARK HEARTBREAKERS      | Animation     |       699.58
+     244 | DORADO NOTTING              | Music         |       697.33
+     579 | MINDS TRUMAN                | Action        |       697.28
+     624 | NIGHTMARE CHILL             | Games         |       697.08
+     683 | PITY BOUND                  | Drama         |       696.09
+     993 | WRONG BEHAVIOR              | Children      |       693.81
+     471 | ISLAND EXORCIST             | Classics      |       692.75
+     305 | FATAL HAUNTED               | New           |       692.26
+     412 | HEAVYWEIGHTS BEAST          | Documentary   |       691.34
+      35 | ARACHNOPHOBIA ROLLERCOASTER | Horror        |       690.43
+     755 | SABRINA MIDNIGHT            | Children      |       686.44
+     418 | HOBBIT ALIEN                | Drama         |       686.43
+     789 | SHOCK CABIN                 | Foreign       |       685.03
+     833 | SPLENDOR PATTON             | Children      |       684.59
+     665 | PATTON INTERVIEW            | Horror        |       681.92
+     231 | DINOSAUR SECRETARY          | Family        |       681.50
+     720 | REDEMPTION COMFORTS         | New           |       679.48
+     734 | ROAD ROXANNE                | Documentary   |       679.47
+     554 | MALKOVICH PET               | Classics      |       676.06
+     409 | HEARTBREAKERS BRIGHT        | Children      |       674.48
+     356 | GIANT TROOPERS              | Children      |       674.04
+     702 | PULP BEVERLY                | Horror        |       672.97
+     804 | SLEEPING SUSPECTS           | Horror        |       672.07
+     891 | TIMBERLAND SKY              | Classics      |       670.92
+     941 | VIDEOTAPE ARSENIC           | Games         |       670.80
+     172 | CONEHEADS SMOOCHY           | Drama         |       669.27
+      43 | ATLANTIS CAUSE              | Family        |       667.57
+     556 | MALTESE HOPE                | Games         |       667.01
+     531 | LOSE INCH                   | Foreign       |       665.14
+     397 | HANKY OCTOBER               | Sci-Fi        |       664.51
+     857 | STRICTLY SCARFACE           | Comedy        |       664.36
+     115 | CAMPUS REMEMBER             | Action        |       661.10
+     183 | CONVERSATION DOWNHILL       | Family        |       659.91
+      37 | ARIZONA BANG                | Classics      |       659.57
+     285 | ENGLISH BULWORTH            | Sci-Fi        |       658.80
+     698 | PRINCESS GIANT              | Documentary   |       658.68
+     915 | TRUMAN CRAZY                | Action        |       657.11
+     502 | KNOCK WARLOCK               | Comedy        |       654.86
+     596 | MOONSHINE CABIN             | Games         |       653.08
+     723 | REIGN GENTLEMEN             | Sci-Fi        |       652.60
+     320 | FLAMINGOS CONNECTICUT       | New           |       652.40
+     641 | ORANGE GRAPES               | Foreign       |       651.36
+     810 | SLUMS DUCK                  | Family        |       651.15
+     167 | COMA HEAD                   | Travel        |       648.67
+     922 | UNDEFEATED DALMATIONS       | Horror        |       647.99
+     735 | ROBBERS JOON                | Children      |       646.81
+     139 | CHASING FIGHT               | Family        |       646.41
+     489 | JUGGLER HARDLY              | Animation     |       646.16
+     199 | CUPBOARD SINNERS            | Documentary   |       646.11
+     131 | CENTER DINOSAUR             | Classics      |       645.07
+     995 | YENTL IDAHO                 | Horror        |       644.41
+     476 | JASON TRAP                  | Family        |       643.66
+     434 | HORROR REIGN                | Travel        |       643.38
+     759 | SALUTE APOLLO               | New           |       642.77
+     791 | SHOW LORD                   | Documentary   |       641.83
+     200 | CURTAIN VIDEOTAPE           | Games         |       641.55
+     603 | MOVIE SHAKESPEARE           | Family        |       641.36
+     358 | GILMORE BOILED              | Classics      |       639.52
+     253 | DRIFTER COMMANDMENTS        | Action        |       639.26
+      21 | AMERICAN CIRCUS             | Action        |       638.67
+     174 | CONFIDENTIAL INTERVIEW      | Music         |       637.56
+     870 | SWARM GOLD                  | Horror        |       635.83
+     887 | THIEF PELICAN               | Animation     |       635.71
+     135 | CHANCE RESURRECTION         | Sports        |       635.31
+     985 | WONDERLAND CHRISTMAS        | Sci-Fi        |       633.11
+     590 | MONEY HAROLD                | New           |       633.05
+     300 | FALCON VOLUME               | Animation     |       632.65
+     586 | MOCKINGBIRD HOLLYWOOD       | Action        |       632.51
+     972 | WHISPERER GIANT             | Sci-Fi        |       631.81
+     301 | FAMILY SWEET                | Horror        |       630.46
+     827 | SPICE SORORITY              | Drama         |       628.19
+     100 | BROOKLYN DESERT             | Foreign       |       628.00
+     408 | HEAD STRANGER               | Games         |       627.98
+     786 | SHEPHERD MIDSUMMER          | Children      |       627.68
+     450 | IDOLS SNATCHERS             | Children      |       627.63
+     234 | DISTURBING SCARFACE         | Sci-Fi        |       627.33
+     982 | WOMEN DORADO                | Action        |       627.32
+     376 | GRAPES FURY                 | Foreign       |       625.74
+     464 | INTENTIONS EMPIRE           | Animation     |       625.31
+     313 | FIDELITY DEVIL              | Horror        |       624.01
+     575 | MIDSUMMER GROUNDHOG         | Documentary   |       623.90
+     484 | JERK PAYCHECK               | Classics      |       622.84
+      12 | ALASKA PHANTOM              | Music         |       621.37
+     204 | DALMATIONS SWEDEN           | Drama         |       621.13
+      15 | ALIEN CENTER                | Foreign       |       620.90
+     748 | RUGRATS SHAKESPEARE         | Action        |       620.00
+     644 | OSCAR GOLD                  | Animation     |       619.06
+     902 | TRADING PINOCCHIO           | Sports        |       618.98
+     227 | DETAILS PACKER              | Games         |       618.79
+     215 | DAWN POND                   | Games         |       618.78
+     366 | GOLDFINGER SENSIBILITY      | Drama         |       616.68
+     518 | LIAISONS SWEET              | Travel        |       616.49
+     391 | HALF OUTFIELD               | Family        |       616.47
+     143 | CHILL LUCK                  | Drama         |       612.66
+     317 | FIREBALL PHILADELPHIA       | Comedy        |       611.96
+      91 | BOUND CHEAPER               | Classics      |       611.86
+     266 | DYNAMITE TARZAN             | Classics      |       611.76
+     901 | TRACY CIDER                 | Animation     |       610.05
+     374 | GRAFFITI LOVE               | Sci-Fi        |       609.07
+     220 | DEER VIRGINIAN              | Music         |       609.02
+     892 | TITANIC BOONDOCK            | Animation     |       609.00
+     181 | CONTACT ANONYMOUS           | Travel        |       606.46
+      10 | ALADDIN CALENDAR            | Sports        |       605.24
+     122 | CARRIE BUNCH                | Horror        |       604.80
+     319 | FISH OPUS                   | Sci-Fi        |       604.21
+      77 | BIRDS PERDITION             | New           |       602.95
+     849 | STORM HAPPINESS             | Animation     |       602.03
+     851 | STRAIGHT HOURS              | Sports        |       601.62
+     117 | CANDLES GRAPES              | Games         |       600.19
+     274 | EGG IGBY                    | Documentary   |       599.73
+     694 | PREJUDICE OLEANDER          | Classics      |       598.09
+     733 | RIVER OUTLAW                | Sports        |       597.33
+     768 | SCARFACE BANG               | Children      |       597.30
+     814 | SNATCH SLIPPER              | Comedy        |       597.15
+     725 | REQUIEM TYCOON              | Classics      |       596.84
+     245 | DOUBLE WRATH                | Animation     |       596.76
+     845 | STEPMOM DREAM               | Foreign       |       596.53
+     506 | LADY STAGE                  | Horror        |       596.12
+     760 | SAMURAI LION                | New           |       595.59
+     823 | SOUTH WAIT                  | Action        |       594.91
+     252 | DREAM PICKUP                | Action        |       594.61
+     247 | DOWNHILL ENOUGH             | Comedy        |       594.12
+     228 | DETECTIVE VISION            | Classics      |       593.85
+     914 | TROUBLE DATE                | Travel        |       593.64
+     989 | WORKING MICROCOSMOS         | Travel        |       593.01
+     852 | STRANGELOVE DESIRE          | Children      |       592.01
+     481 | JEKYLL FROGMEN              | New           |       591.45
+     304 | FARGO GANDHI                | Children      |       591.39
+     583 | MISSION ZOOLANDER           | Animation     |       590.12
+     311 | FICTION CHRISTMAS           | Foreign       |       590.08
+     951 | VOYAGE LEGALLY              | Classics      |       589.97
+     327 | FOOL MOCKINGBIRD            | Action        |       589.52
+     800 | SINNERS ATLANTIS            | Horror        |       588.93
+     154 | CLASH FREDDY                | Animation     |       588.74
+     267 | EAGLES PANKY                | New           |       588.46
+     865 | SUNRISE LEAGUE              | Animation     |       588.13
+     273 | EFFECT GLADIATOR            | Family        |       586.48
+     162 | CLUELESS BUCKET             | Action        |       585.83
+     170 | COMMAND DARLING             | Foreign       |       584.61
+     307 | FELLOWSHIP AUTUMN           | Travel        |       584.40
+      57 | BASIC EASY                  | Travel        |       583.22
+     648 | OUTLAW HANKY                | Travel        |       581.99
+     945 | VIRGINIAN PLUTO             | Documentary   |       580.64
+     595 | MOON BUNCH                  | Foreign       |       580.60
+      78 | BLACKOUT PRIVATE            | Animation     |       579.76
+     570 | MERMAID INSECTS             | Sports        |       578.54
+     790 | SHOOTIST SUPERFLY           | Drama         |       578.11
+       6 | AGENT TRUMAN                | Foreign       |       577.85
+     655 | PANTHER REDS                | Sci-Fi        |       577.63
+     697 | PRIMARY GLASS               | Action        |       576.90
+     119 | CAPER MOTIONS               | Comedy        |       576.75
+     710 | RAGE GAMES                  | Family        |       574.48
+     958 | WARDROBE PHANTOM            | Drama         |       574.00
+     555 | MALLRATS UNITED             | Comedy        |       573.01
+     895 | TOMORROW HUSTLER            | Classics      |       572.98
+     494 | KARATE MOON                 | Horror        |       572.43
+     514 | LEBOWSKI SOLDIERS           | Drama         |       572.35
+     439 | HUNCHBACK IMPOSSIBLE        | Drama         |       571.25
+     255 | DRIVING POLISH              | Music         |       571.13
+     392 | HALL CASSIDY                | Children      |       570.57
+     445 | HYDE DOCTOR                 | Classics      |       570.05
+     465 | INTERVIEW LIAISONS          | New           |       569.76
+     329 | FORREST SONS                | Action        |       569.31
+     206 | DANCING FEVER               | Documentary   |       567.67
+     114 | CAMELOT VACATION            | Sci-Fi        |       566.01
+     512 | LEAGUE HELLFIGHTERS         | Classics      |       565.85
+     322 | FLATLINERS KILLER           | Sports        |       565.62
+     944 | VIRGIN DAISY                | Drama         |       565.00
+     334 | FREDDY STORM                | Horror        |       564.70
+     776 | SECRET GROUNDHOG            | Documentary   |       564.38
+      67 | BERETS AGENT                | Action        |       564.20
+     838 | STAGECOACH ARMAGEDDON       | Action        |       563.61
+     841 | STAR OPERATION              | Sports        |       562.24
+     687 | POCUS PULP                  | Documentary   |       561.99
+     676 | PHILADELPHIA WIFE           | Sports        |       561.18
+     218 | DECEIVER BETRAYED           | Drama         |       560.44
+       1 | ACADEMY DINOSAUR            | Documentary   |       560.17
+     243 | DOORS PRESIDENT             | Animation     |       559.14
+     176 | CONGENIALITY QUEST          | Sports        |       558.79
+     346 | GALAXY SWEETHEARTS          | Classics      |       558.54
+     930 | VACATION BOONDOCK           | Sci-Fi        |       558.06
+     611 | MUSKETEERS WAIT             | Classics      |       557.69
+      22 | AMISTAD MIDSUMMER           | New           |       557.33
+     395 | HANDICAP BOONDOCK           | Action        |       555.41
+     385 | GROUNDHOG UNCUT             | Comedy        |       554.32
+     966 | WEDDING APOLLO              | Documentary   |       553.85
+     651 | PACKER MADIGAN              | Animation     |       553.85
+     677 | PIANIST OUTFIELD            | New           |       553.64
+     222 | DESERT POSEIDON             | Horror        |       553.04
+     875 | TALENTED HOMICIDE           | Sports        |       552.24
+      45 | ATTRACTION NEWTON           | New           |       552.04
+     890 | TIGHTS DAWN                 | Sports        |       551.32
+     778 | SECRETS PARADISE            | Family        |       549.85
+     777 | SECRETARY ROUGE             | Sports        |       549.71
+     743 | ROOM ROMAN                  | Animation     |       549.48
+     121 | CAROL TEXAS                 | Animation     |       549.22
+     486 | JET NEIGHBORS               | Foreign       |       548.29
+     816 | SNOWMAN ROLLERCOASTER       | Animation     |       548.09
+     193 | CROSSROADS CASUALTIES       | Animation     |       547.57
+     578 | MILLION ACE                 | Classics      |       547.49
+     986 | WONKA SEA                   | Animation     |       546.98
+     101 | BROTHERHOOD BLANKET         | Documentary   |       546.64
+     619 | NEIGHBORS CHARADE           | Sports        |       546.36
+     645 | OTHERS SOUP                 | Travel        |       545.88
+     812 | SMOKING BARBARELLA          | Documentary   |       544.73
+     657 | PARADISE SABRINA            | Comedy        |       544.44
+      61 | BEAUTY GREASE               | Drama         |       543.25
+     429 | HONEY TIES                  | Sports        |       542.30
+     616 | NATIONAL STORY              | Documentary   |       541.56
+      51 | BALLOON HOMEWARD            | Music         |       540.94
+     614 | NAME DETECTIVE              | Games         |       539.39
+     668 | PEAK FOREVER                | Sports        |       538.58
+     680 | PINOCCHIO SIMON             | Comedy        |       538.55
+     672 | PERFECT GROOVE              | Comedy        |       538.31
+     861 | SUIT WALLS                  | Games         |       538.01
+     447 | ICE CROSSING                | Games         |       537.62
+     433 | HORN WORKING                | Animation     |       537.35
+     527 | LOLA AGENT                  | Horror        |       537.34
+     288 | ESCAPE METROPOLIS           | Travel        |       537.28
+      49 | BADMAN DAWN                 | Sci-Fi        |       536.30
+      17 | ALONE TRIP                  | Music         |       536.29
+     282 | ENCOUNTERS CURTAIN          | Drama         |       534.86
+     775 | SEATTLE EXPECATIONS         | Drama         |       534.57
+     863 | SUN CONFESSIONS             | Sci-Fi        |       533.98
+      39 | ARMAGEDDON LOST             | Sci-Fi        |       533.91
+      55 | BARBARELLA STREETCAR        | Sci-Fi        |       533.21
+      11 | ALAMO VIDEOTAPE             | Foreign       |       531.97
+     580 | MINE TITANS                 | New           |       531.85
+     189 | CREATURES SHAKESPEARE       | Games         |       529.38
+      95 | BREAKFAST GOLDFINGER        | New           |       529.28
+       9 | ALABAMA DEVIL               | Horror        |       528.35
+     647 | OUTFIELD MASSACRE           | Music         |       527.88
+     850 | STORY SIDE                  | Action        |       527.35
+     414 | HELLFIGHTERS SIERRA         | Foreign       |       527.31
+     970 | WESTWARD SEABISCUIT         | Classics      |       526.28
+     141 | CHICAGO NORTH               | Games         |       526.04
+     123 | CASABLANCA SUPER            | Travel        |       526.00
+     417 | HILLS NEIGHBORS             | Action        |       525.95
+     377 | GREASE YOUTH                | Family        |       525.27
+     402 | HARPER DYING                | Animation     |       524.71
+     367 | GOLDMINE TYCOON             | Sci-Fi        |       524.10
+     432 | HOPE TOOTSIE                | Classics      |       523.78
+      59 | BEAR GRACELAND              | Children      |       523.62
+     643 | ORIENT CLOSER               | Drama         |       523.53
+     981 | WOLVES DESIRE               | Travel        |       523.40
+     772 | SEA VIRGIN                  | Drama         |       523.11
+     864 | SUNDANCE INVASION           | Children      |       522.97
+     763 | SATISFACTION CONFIDENTIAL   | Sports        |       522.06
+     691 | POSEIDON FOREVER            | Sports        |       521.22
+     280 | EMPIRE MALKOVICH            | Children      |       520.82
+     130 | CELEBRITY HORN              | Action        |       520.62
+     158 | CLONES PINOCCHIO            | Music         |       520.59
+     707 | QUEST MUSSOLINI             | Action        |       519.46
+     571 | METAL ARMAGEDDON            | Documentary   |       519.02
+     637 | OPEN AFRICAN                | Sci-Fi        |       518.25
+      90 | BOULEVARD MOB               | New           |       518.01
+     936 | VANISHING ROCKY             | Music         |       517.62
+     150 | CIDER DESIRE                | Documentary   |       517.22
+     415 | HIGH ENCINO                 | Horror        |       515.66
+     820 | SONS INTERVIEW              | Animation     |       515.49
+      19 | AMADEUS HOLY                | Action        |       515.35
+     785 | SHAWSHANK BUBBLE            | Travel        |       512.80
+     689 | POLLOCK DELIVERANCE         | Foreign       |       511.90
+     724 | REMEMBER DIARY              | Family        |       509.04
+     129 | CAUSE DATE                  | Documentary   |       508.98
+     606 | MUMMY CREATURES             | Sports        |       508.66
+     270 | EARTH VISION                | New           |       507.20
+     149 | CHRISTMAS MOONSHINE         | Children      |       506.73
+      25 | ANGELS LIFE                 | New           |       506.42
+     501 | KISSING DOLLS               | Action        |       506.23
+     467 | INTRIGUE WORST              | Foreign       |       505.99
+     782 | SHAKESPEARE SADDLE          | Sports        |       505.04
+     314 | FIGHT JAWBREAKER            | Animation     |       504.99
+     963 | WATCH TRACY                 | Animation     |       501.97
+     191 | CROOKED FROGMEN             | Children      |       501.67
+     483 | JERICHO MULAN               | Games         |       501.46
+      99 | BRINGING HYSTERICAL         | Comedy        |       501.24
+     796 | SIERRA DIVIDE               | Sports        |       500.39
+     302 | FANTASIA PARK               | Games         |       500.37
+     160 | CLUB GRAFFITI               | Animation     |       498.99
+     184 | CORE SUIT                   | Classics      |       498.06
+     294 | EXPECATIONS NATURAL         | Travel        |       497.68
+     175 | CONFUSED CANDLES            | Family        |       496.45
+     116 | CANDIDATE PERDITION         | Classics      |       494.77
+     937 | VARSITY TRIP                | New           |       494.64
+     784 | SHANGHAI TYCOON             | Travel        |       494.33
+     991 | WORST BANGER                | Action        |       492.79
+     542 | LUST LOCK                   | Action        |       492.63
+      89 | BORROWERS BEDAZZLED         | Animation     |       491.71
+     999 | ZOOLANDER FICTION           | Children      |       491.66
+     428 | HOMICIDE PEACH              | Family        |       491.59
+     353 | GENTLEMEN STAGE             | Foreign       |       491.47
+     351 | GASLIGHT CRUSADE            | Horror        |       491.40
+     496 | KICK SAVANNAH               | Travel        |       490.16
+      74 | BIRCH ANTITRUST             | Music         |       490.06
+     388 | GUNFIGHT MOON               | Comedy        |       489.84
+     326 | FLYING HOOK                 | Animation     |       489.66
+     281 | ENCINO ELF                  | Games         |       489.01
+     599 | MOTHER OLEANDER             | Sports        |       488.49
+     292 | EXCITEMENT EVE              | Action        |       488.07
+     664 | PATRIOT ROMAN               | Action        |       487.94
+     437 | HOUSE DYNAMITE              | Family        |       487.88
+     457 | INDEPENDENCE HOTEL          | Documentary   |       487.81
+     436 | HOURS RAGE                  | New           |       487.77
+     806 | SLEEPY JAPANESE             | New           |       487.65
+     398 | HANOVER GALAXY              | Music         |       487.05
+     456 | INCH JET                    | Animation     |       487.00
+     309 | FEUD FROGMEN                | Family        |       486.66
+      72 | BILL OTHERS                 | Documentary   |       485.21
+     216 | DAY UNFAITHFUL              | New           |       485.17
+     545 | MADNESS ATTACKS             | Foreign       |       482.92
+     706 | QUEEN LUKE                  | Drama         |       481.78
+     303 | FANTASY TROOPERS            | Action        |       481.41
+      70 | BIKINI BORROWERS            | Animation     |       480.15
+     363 | GO PURPLE                   | Music         |       478.11
+     504 | KWAI HOMEWARD               | Drama         |       478.02
+     898 | TOURIST PELICAN             | Sports        |       477.60
+     709 | RACER EGG                   | Drama         |       477.53
+     147 | CHOCOLAT HARRY              | Family        |       477.30
+     704 | PURE RUNNER                 | Comedy        |       477.20
+      18 | ALTER VICTORY               | Animation     |       476.93
+     524 | LION UNCUT                  | Comedy        |       476.71
+     226 | DESTINY SATURDAY            | New           |       476.56
+     737 | ROCK INSTINCT               | Horror        |       475.75
+     271 | EASY GLADIATOR              | Action        |       475.45
+     757 | SAGEBRUSH CLUELESS          | Documentary   |       475.09
+     805 | SLEEPLESS MONSOON           | Animation     |       474.13
+     696 | PRIDE ALAMO                 | Animation     |       473.44
+     818 | SOMETHING DUCK              | Drama         |       472.96
+     803 | SLACKER LIAISONS            | Drama         |       472.33
+      56 | BAREFOOT MANCHURIAN         | Action        |       472.03
+     953 | WAIT CIDER                  | Animation     |       471.36
+     166 | COLOR PHILADELPHIA          | Classics      |       470.24
+      79 | BLADE POLISH                | Drama         |       469.91
+     728 | REUNION WITCHES             | Drama         |       469.89
+     628 | NORTHWEST POLISH            | Sports        |       467.72
+     649 | OZ LIAISONS                 | Animation     |       467.70
+     807 | SLEUTH ORIENT               | Games         |       467.55
+     920 | UNBREAKABLE KARATE          | New           |       466.25
+      50 | BAKED CLEOPATRA             | Family        |       465.32
+     142 | CHICKEN HELLFIGHTERS        | Documentary   |       464.56
+     453 | IMAGE PRINCESS              | Sports        |       464.19
+     741 | ROMAN PUNK                  | Music         |       463.75
+     536 | LOVELY JINGLE               | Classics      |       463.53
+     479 | JEDI BENEATH                | Family        |       462.97
+     829 | SPINAL ROCKY                | Family        |       462.41
+     275 | EGYPT TENENBAUMS            | Horror        |       461.94
+     917 | TUXEDO MILE                 | Sports        |       461.25
+     462 | INSIDER ARIZONA             | Music         |       461.20
+     324 | FLINTSTONES HAPPINESS       | Comedy        |       460.80
+     948 | VOICE PEACH                 | New           |       460.36
+     416 | HIGHBALL POTTER             | Foreign       |       460.04
+     964 | WATERFRONT DELIVERANCE      | Action        |       459.11
+       7 | AIRPLANE SIERRA             | Comedy        |       458.04
+     249 | DRACULA CRYSTAL             | Classics      |       457.96
+     336 | FRENCH HOLIDAY              | Documentary   |       456.89
+     608 | MURDER ANTITRUST            | Children      |       456.53
+     749 | RULES HUMAN                 | Horror        |       455.50
+     678 | PICKUP DRIVING              | Sports        |       455.44
+     956 | WANDA CHAMBER               | Games         |       455.43
+     242 | DOOM DANCING                | Comedy        |       455.35
+      83 | BLUES INSTINCT              | Family        |       453.29
+     251 | DRAGONFLY STRANGERS         | New           |       453.07
+     774 | SEARCHERS WAIT              | Comedy        |       451.21
+     871 | SWEDEN SHINING              | Comedy        |       451.01
+     406 | HAUNTING PIANIST            | Games         |       450.52
+     448 | IDAHO LOVE                  | New           |       449.79
+     254 | DRIVER ANNIE                | Sports        |       449.54
+     681 | PIRATES ROXANNE             | Sports        |       448.75
+     650 | PACIFIC AMISTAD             | Documentary   |       448.26
+     491 | JUMPING WRATH               | Children      |       446.58
+     269 | EARRING INSTINCT            | Family        |       446.47
+     458 | INDIAN LOVE                 | Family        |       446.43
+     478 | JAWS HARRY                  | Comedy        |       446.13
+     474 | JADE BUNCH                  | Sports        |       446.01
+     976 | WIND PHANTOM                | Games         |       443.93
+     380 | GREEK EVERYONE              | Foreign       |       443.10
+     877 | TAXI KICK                   | Music         |       442.17
+     233 | DISCIPLE MOTHER             | Travel        |       440.04
+     623 | NEWTON LABYRINTH            | Foreign       |       438.61
+     344 | FURY MURDER                 | Children      |       438.26
+     348 | GANDHI KWAI                 | Family        |       437.55
+     345 | GABLES METROPOLIS           | Family        |       436.18
+     975 | WILLOW TRACY                | Family        |       435.11
+     949 | VOLCANO TEXAS               | Games         |       434.03
+      48 | BACKLASH UNDEFEATED         | Children      |       432.75
+     747 | ROXANNE REBEL               | Games         |       431.95
+     463 | INSTINCT AIRPORT            | Sports        |       431.74
+     446 | HYSTERICAL GRAIL            | Sports        |       431.40
+      65 | BEHAVIOR RUNAWAY            | Horror        |       431.34
+     451 | IGBY MAKER                  | Travel        |       430.06
+     354 | GHOST GROUNDHOG             | Children      |       427.24
+     370 | GORGEOUS BINGO              | Children      |       427.16
+     133 | CHAMBER ITALIAN             | Music         |       425.38
+     913 | TROOPERS METAL              | New           |       424.51
+     455 | IMPOSSIBLE PREJUDICE        | Foreign       |       423.65
+     544 | MADISON TRAP                | Documentary   |       423.27
+     847 | STOCK GLASS                 | New           |       421.41
+     219 | DEEP CRUSADE                | Documentary   |       416.41
+      85 | BONNIE HOLOCAUST            | Documentary   |       415.92
+     971 | WHALE BIKINI                | Foreign       |       414.24
+     164 | COAST RAINBOW               | Documentary   |       409.81
+     988 | WORKER TARZAN               | Travel        |       405.36
+     961 | WASH HEAVENLY               | Foreign       |       405.35
+     207 | DANGEROUS UPTOWN            | Foreign       |       404.93
+     878 | TEEN APOLLO                 | Travel        |       404.51
+     286 | ENOUGH RAGING               | Travel        |       402.15
+     894 | TOMATOES HELLFIGHTERS       | Travel        |       401.35
+(471 rows)
+
+[3B. Execution Plan: EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)]
+                                                                                       QUERY PLAN                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=490229479.27..490229575.99 rows=38690 width=123) (actual time=19967.343..19968.042 rows=471 loops=1)
+   Sort Key: (sum(p.amount)) DESC
+   Sort Method: quicksort  Memory: 62kB
+   Buffers: shared hit=8409593, temp read=690 written=692
+   ->  GroupAggregate  (cost=13062.52..490224018.15 rows=38690 width=123) (actual time=417.288..19966.523 rows=471 loops=1)
+         Group Key: f.film_id, c.name, fc.category_id
+         Filter: (sum(p.amount) > (SubPlan 1))
+         Rows Removed by Filter: 487
+         Buffers: shared hit=8409593, temp read=690 written=692
+         ->  Gather Merge  (cost=13062.52..26580.79 rows=116070 width=97) (actual time=386.930..413.032 rows=116049 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=2340, temp read=690 written=692
+               ->  Sort  (cost=12062.50..12183.41 rows=48362 width=97) (actual time=321.725..325.278 rows=38683 loops=3)
+                     Sort Key: f.film_id, c.name, fc.category_id
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=2340, temp read=690 written=692
+                     Worker 0:  Sort Method: external merge  Disk: 2776kB
+                     Worker 1:  Sort Method: external merge  Disk: 2744kB
+                     ->  Hash Join  (cost=2954.21..5653.55 rows=48362 width=97) (actual time=291.994..308.946 rows=38683 loops=3)
+                           Hash Cond: (r.inventory_id = i.inventory_id)
+                           Buffers: shared hit=2310
+                           ->  Parallel Hash Join  (cost=2620.87..4655.24 rows=48362 width=10) (actual time=8.887..20.711 rows=38683 loops=3)
+                                 Hash Cond: (p.rental_id = r.rental_id)
+                                 Buffers: shared hit=1939
+                                 ->  Parallel Append  (cost=0.00..1899.10 rows=51528 width=10) (actual time=0.031..6.286 rows=58024 loops=2)
+                                       Buffers: shared hit=854
+                                       ->  Parallel Seq Scan on payment p_1  (cost=0.00..1536.64 rows=68264 width=10) (actual time=0.028..3.497 rows=58024 loops=2)
+                                             Buffers: shared hit=854
+                                       ->  Parallel Seq Scan on payment_p2007_01 p_2  (cost=0.00..17.47 rows=747 width=16) (actual time=0.001..0.002 rows=0 loops=1)
+                                       ->  Parallel Seq Scan on payment_p2007_02 p_3  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                       ->  Parallel Seq Scan on payment_p2007_03 p_4  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                       ->  Parallel Seq Scan on payment_p2007_04 p_5  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                       ->  Parallel Seq Scan on payment_p2007_05 p_6  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                       ->  Parallel Seq Scan on payment_p2007_06 p_7  (cost=0.00..17.47 rows=747 width=16) (actual time=0.000..0.000 rows=0 loops=1)
+                                 ->  Parallel Hash  (cost=1767.61..1767.61 rows=68261 width=8) (actual time=8.550..8.550 rows=38681 loops=3)
+                                       Buckets: 131072  Batches: 1  Memory Usage: 5600kB
+                                       Buffers: shared hit=1085
+                                       ->  Parallel Seq Scan on rental r  (cost=0.00..1767.61 rows=68261 width=8) (actual time=0.022..3.186 rows=58022 loops=2)
+                                             Buffers: shared hit=1085
+                           ->  Hash  (cost=276.07..276.07 rows=4581 width=95) (actual time=283.077..283.081 rows=4581 loops=3)
+                                 Buckets: 8192  Batches: 1  Memory Usage: 376kB
+                                 Buffers: shared hit=371
+                                 ->  Hash Join  (cost=137.28..276.07 rows=4581 width=95) (actual time=281.738..282.381 rows=4581 loops=3)
+                                       Hash Cond: (i.film_id = f.film_id)
+                                       Buffers: shared hit=371
+                                       ->  Seq Scan on inventory i  (cost=0.00..75.81 rows=4581 width=8) (actual time=0.016..0.198 rows=4581 loops=3)
+                                             Buffers: shared hit=90
+                                       ->  Hash  (cost=124.78..124.78 rows=1000 width=95) (actual time=281.705..281.707 rows=1000 loops=3)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 75kB
+                                             Buffers: shared hit=281
+                                             ->  Nested Loop  (cost=77.66..124.78 rows=1000 width=95) (actual time=281.198..281.549 rows=1000 loops=3)
+                                                   Buffers: shared hit=281
+                                                   ->  Hash Join  (cost=77.50..96.14 rows=1000 width=27) (actual time=281.152..281.298 rows=1000 loops=3)
+                                                         Hash Cond: (fc.film_id = f.film_id)
+                                                         Buffers: shared hit=183
+                                                         ->  Seq Scan on film_category fc  (cost=0.00..16.00 rows=1000 width=8) (actual time=0.006..0.051 rows=1000 loops=3)
+                                                               Buffers: shared hit=18
+                                                         ->  Hash  (cost=65.00..65.00 rows=1000 width=19) (actual time=281.129..281.130 rows=1000 loops=3)
+                                                               Buckets: 1024  Batches: 1  Memory Usage: 59kB
+                                                               Buffers: shared hit=165
+                                                               ->  Seq Scan on film f  (cost=0.00..65.00 rows=1000 width=19) (actual time=280.860..280.994 rows=1000 loops=3)
+                                                                     Buffers: shared hit=165
+                                                   ->  Memoize  (cost=0.16..0.23 rows=1 width=72) (actual time=0.000..0.000 rows=1 loops=3000)
+                                                         Cache Key: fc.category_id
+                                                         Cache Mode: logical
+                                                         Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                         Buffers: shared hit=98
+                                                         Worker 0:  Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                         Worker 1:  Hits: 984  Misses: 16  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                         ->  Index Scan using category_pkey on category c  (cost=0.15..0.22 rows=1 width=72) (actual time=0.003..0.003 rows=1 loops=48)
+                                                               Index Cond: (category_id = fc.category_id)
+                                                               Buffers: shared hit=98
+         SubPlan 1
+           ->  Aggregate  (cost=4223.26..4223.27 rows=1 width=32) (actual time=20.394..20.394 rows=1 loops=958)
+                 Buffers: shared hit=8407253
+                 ->  HashAggregate  (cost=4198.25..4210.75 rows=1000 width=36) (actual time=20.362..20.372 rows=60 loops=958)
+                       Group Key: f2.film_id
+                       Batches: 1  Memory Usage: 97kB
+                       Buffers: shared hit=8407253
+                       ->  Hash Join  (cost=857.52..4162.27 rows=7196 width=10) (actual time=4.233..19.525 rows=7322 loops=958)
+                             Hash Cond: (p2.rental_id = r2.rental_id)
+                             Buffers: shared hit=8407253
+                             ->  Append  (cost=0.00..2769.03 rows=123669 width=10) (actual time=0.003..9.142 rows=116049 loops=958)
+                                   Buffers: shared hit=818132
+                                   ->  Seq Scan on payment p2_1  (cost=0.00..2014.49 rows=116049 width=10) (actual time=0.002..4.289 rows=116049 loops=958)
+                                         Buffers: shared hit=818132
+                                   ->  Seq Scan on payment_p2007_01 p2_2  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.001..0.001 rows=0 loops=958)
+                                   ->  Seq Scan on payment_p2007_02 p2_3  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.000..0.000 rows=0 loops=958)
+                                   ->  Seq Scan on payment_p2007_03 p2_4  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.000..0.000 rows=0 loops=958)
+                                   ->  Seq Scan on payment_p2007_04 p2_5  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.000..0.000 rows=0 loops=958)
+                                   ->  Seq Scan on payment_p2007_05 p2_6  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.000..0.000 rows=0 loops=958)
+                                   ->  Seq Scan on payment_p2007_06 p2_7  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.000..0.000 rows=0 loops=958)
+                             ->  Hash  (cost=767.60..767.60 rows=7194 width=8) (actual time=4.191..4.191 rows=7322 loops=958)
+                                   Buckets: 16384 (originally 8192)  Batches: 1 (originally 1)  Memory Usage: 472kB
+                                   Buffers: shared hit=7589121
+                                   ->  Nested Loop  (cost=87.98..767.60 rows=7194 width=8) (actual time=0.215..3.506 rows=7322 loops=958)
+                                         Buffers: shared hit=7589121
+                                         ->  Hash Join  (cost=87.69..183.51 rows=284 width=8) (actual time=0.196..0.548 rows=289 loops=958)
+                                               Hash Cond: (i2.film_id = f2.film_id)
+                                               Buffers: shared hit=87178
+                                               ->  Seq Scan on inventory i2  (cost=0.00..75.81 rows=4581 width=8) (actual time=0.001..0.155 rows=4581 loops=958)
+                                                     Buffers: shared hit=28740
+                                               ->  Hash  (cost=86.91..86.91 rows=62 width=8) (actual time=0.184..0.184 rows=63 loops=958)
+                                                     Buckets: 1024  Batches: 1  Memory Usage: 11kB
+                                                     Buffers: shared hit=58438
+                                                     ->  Hash Join  (cost=19.27..86.91 rows=62 width=8) (actual time=0.043..0.166 rows=63 loops=958)
+                                                           Hash Cond: (f2.film_id = fc2.film_id)
+                                                           Buffers: shared hit=58438
+                                                           ->  Seq Scan on film f2  (cost=0.00..65.00 rows=1000 width=4) (actual time=0.001..0.080 rows=1000 loops=958)
+                                                                 Buffers: shared hit=52690
+                                                           ->  Hash  (cost=18.50..18.50 rows=62 width=4) (actual time=0.038..0.038 rows=63 loops=958)
+                                                                 Buckets: 1024  Batches: 1  Memory Usage: 11kB
+                                                                 Buffers: shared hit=5748
+                                                                 ->  Seq Scan on film_category fc2  (cost=0.00..18.50 rows=62 width=4) (actual time=0.004..0.027 rows=63 loops=958)
+                                                                       Filter: (category_id = fc.category_id)
+                                                                       Rows Removed by Filter: 937
+                                                                       Buffers: shared hit=5748
+                                         ->  Index Scan using idx_fk_inventory_id on rental r2  (cost=0.29..1.81 rows=25 width=8) (actual time=0.001..0.009 rows=25 loops=276869)
+                                               Index Cond: (inventory_id = i2.inventory_id)
+                                               Buffers: shared hit=7501943
+ Planning:
+   Buffers: shared hit=189
+ Planning Time: 3.319 ms
+ JIT:
+   Functions: 232
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+   Timing: Generation 7.490 ms, Inlining 60.311 ms, Optimization 430.708 ms, Emission 351.868 ms, Total 850.376 ms
+ Execution Time: 19972.151 ms
+(129 rows)
+
+
+--------------------------------------------------------------------------------
+QUERY 4: Store Staff Quarterly Sales & Workload Throughput
+--------------------------------------------------------------------------------
+
+[4A. Query Results]
+ staff_id |  staff_name  | rental_year | rental_quarter | total_rentals_processed | total_payments_collected 
+----------+--------------+-------------+----------------+-------------------------+--------------------------
+        2 | Jon Stephens |        2026 |              3 |                   10850 |                 37318.56
+        1 | Mike Hillyer |        2026 |              3 |                   10830 |                 37287.41
+        2 | Jon Stephens |        2026 |              2 |                   12179 |                 41908.55
+        1 | Mike Hillyer |        2026 |              2 |                   12196 |                 41901.70
+        2 | Jon Stephens |        2026 |              1 |                   10399 |                 35892.21
+        1 | Mike Hillyer |        2026 |              1 |                   10234 |                 35372.38
+        2 | Jon Stephens |        2025 |              4 |                   14482 |                 49703.29
+        1 | Mike Hillyer |        2025 |              4 |                   14411 |                 49450.87
+        1 | Mike Hillyer |        2025 |              3 |                    2228 |                  7502.57
+        2 | Jon Stephens |        2025 |              3 |                    2191 |                  7443.47
+        2 | Jon Stephens |        2006 |              1 |                      97 |                   296.01
+        1 | Mike Hillyer |        2006 |              1 |                      85 |                   218.17
+        2 | Jon Stephens |        2005 |              3 |                    6161 |                 26305.39
+        1 | Mike Hillyer |        2005 |              3 |                    6234 |                 26133.66
+        2 | Jon Stephens |        2005 |              2 |                    1747 |                  7281.53
+        1 | Mike Hillyer |        2005 |              2 |                    1725 |                  7181.75
+(16 rows)
+
+[4B. Execution Plan: EXPLAIN (ANALYZE, BUFFERS, COSTS, TIMING)]
+                                                                                        QUERY PLAN                                                                                        
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=42765.79..43055.96 rows=116070 width=84) (actual time=103.985..103.989 rows=16 loops=1)
+   Sort Key: ((EXTRACT(year FROM r.rental_date))::integer) DESC, ((EXTRACT(quarter FROM r.rental_date))::integer) DESC, (sum(p.amount)) DESC
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=1940
+   ->  HashAggregate  (cost=21988.19..27447.11 rows=116070 width=84) (actual time=103.908..103.974 rows=16 loops=1)
+         Group Key: s.staff_id, (((s.first_name)::text || ' '::text) || (s.last_name)::text), (EXTRACT(year FROM r.rental_date))::integer, (EXTRACT(quarter FROM r.rental_date))::integer
+         Planned Partitions: 8  Batches: 1  Memory Usage: 793kB
+         Buffers: shared hit=1940
+         ->  Hash Join  (cost=3709.14..8857.77 rows=116070 width=54) (actual time=16.536..85.759 rows=116049 loops=1)
+               Hash Cond: (r.staff_id = s.staff_id)
+               Buffers: shared hit=1940
+               ->  Hash Join  (cost=3695.99..6789.67 rows=116070 width=22) (actual time=16.514..47.191 rows=116049 loops=1)
+                     Hash Cond: (p.rental_id = r.rental_id)
+                     Buffers: shared hit=1939
+                     ->  Append  (cost=0.00..2769.03 rows=123669 width=10) (actual time=0.003..11.470 rows=116049 loops=1)
+                           Buffers: shared hit=854
+                           ->  Seq Scan on payment p_1  (cost=0.00..2014.49 rows=116049 width=10) (actual time=0.002..6.408 rows=116049 loops=1)
+                                 Buffers: shared hit=854
+                           ->  Seq Scan on payment_p2007_01 p_2  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.007..0.007 rows=0 loops=1)
+                           ->  Seq Scan on payment_p2007_02 p_3  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.013..0.013 rows=0 loops=1)
+                           ->  Seq Scan on payment_p2007_03 p_4  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.001..0.001 rows=0 loops=1)
+                           ->  Seq Scan on payment_p2007_04 p_5  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.001..0.001 rows=0 loops=1)
+                           ->  Seq Scan on payment_p2007_05 p_6  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.001..0.001 rows=0 loops=1)
+                           ->  Seq Scan on payment_p2007_06 p_7  (cost=0.00..22.70 rows=1270 width=16) (actual time=0.003..0.003 rows=0 loops=1)
+                     ->  Hash  (cost=2245.44..2245.44 rows=116044 width=16) (actual time=16.218..16.218 rows=116044 loops=1)
+                           Buckets: 131072  Batches: 1  Memory Usage: 6464kB
+                           Buffers: shared hit=1085
+                           ->  Seq Scan on rental r  (cost=0.00..2245.44 rows=116044 width=16) (actual time=0.003..5.679 rows=116044 loops=1)
+                                 Buffers: shared hit=1085
+               ->  Hash  (cost=11.40..11.40 rows=140 width=220) (actual time=0.010..0.010 rows=2 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                     Buffers: shared hit=1
+                     ->  Seq Scan on staff s  (cost=0.00..11.40 rows=140 width=220) (actual time=0.005..0.005 rows=2 loops=1)
+                           Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=20
+ Planning Time: 0.570 ms
+ Execution Time: 104.869 ms
+(38 rows)
+
